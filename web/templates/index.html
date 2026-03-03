@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Face Detection - Image Upload</title>
+  <style>
+    body { font-family: Arial; margin: 40px; }
+    .box { max-width: 700px; padding: 20px; border: 1px solid #ddd; border-radius: 10px; }
+    img { max-width: 100%; margin-top: 20px; border-radius: 10px; }
+    .error { color: red; }
+    .success { color: green; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h2>Face Detection Web App</h2>
+
+    <form action="/upload" method="post" enctype="multipart/form-data">
+      <input type="file" name="file" accept=".jpg,.jpeg,.png" required>
+      <button type="submit">Upload & Detect</button>
+    </form>
+
+    {% if error %}
+      <p class="error">{{ error }}</p>
+    {% endif %}
+
+    {% if face_count is not none %}
+      <p class="success">Detected Faces: {{ face_count }}</p>
+    {% endif %}
+
+    {% if output_url %}
+      <img src="{{ output_url }}">
+    {% endif %}
+  </div>
+</body>
+</html>
