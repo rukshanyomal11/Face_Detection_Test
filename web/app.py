@@ -1,4 +1,5 @@
 import os
+import sys
 import uuid
 import cv2
 import numpy as np
@@ -7,6 +8,8 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 
+# Add the parent directory to Python path to import from src
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.utils.detector import detect_and_draw_faces
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -55,25 +58,35 @@ async def upload_image(request: Request, file: UploadFile = File(...)):
                 "error": "Could not read the image."
             })
 
-        out_img, face_count = detect_and_draw_faces(img, min_conf=0.5)
+        # Enhanced detection with lower confidence threshold for better accuracy
+        out_img, face_count = detect_and_draw_faces(img, min_conf=0.3)
 
         out_name = f"{uuid.uuid4().hex}.jpg"
         out_path = os.path.join(OUTPUT_DIR, out_name)
-        cv2.imwrite(out_path, out_img)
+        
+        # Save with high quality
+        cv2.imwrite(out_path, out_img, [cv2.IMWRITE_JPEG_QUALITY, 95])
 
         output_url = f"/static/outputs/{out_name}"
 
+        # Provide more detailed feedback
+        detection_message = f"Detected {face_count} face(s) using advanced AI models"
+        
         return templates.TemplateResponse("index.html", {
             "request": request,
             "output_url": output_url,
             "face_count": face_count,
+            "detection_message": detection_message,
             "error": None
         })
 
     except Exception as e:
+        error_msg = f"Processing error: {str(e)}"
+        print(f"Error processing image: {e}")  # Log for debugging
+        
         return templates.TemplateResponse("index.html", {
             "request": request,
             "output_url": None,
             "face_count": None,
-            "error": str(e)
+            "error": error_msg
         })

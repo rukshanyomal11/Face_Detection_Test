@@ -4,3 +4,9 @@ python-multipart
 jinja2
 opencv-python
 mediapipe; python_version < "3.13"
+mtcnn
+face-recognition
+dlib-binary
+tensorflow
+numpy
+Pillow
