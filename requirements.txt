@@ -10,3 +10,10 @@ dlib-binary
 tensorflow
 numpy
 Pillow
+deepface
+fer2013-lib
+age-gender-estimation
+scipy
+matplotlib
+seaborn
+requests
