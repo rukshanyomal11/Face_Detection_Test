@@ -1,0 +1,19 @@
+<div id="compare-tab" class="tab-content">
+  <div class="panel upload-section">
+    <form id="compareForm" enctype="multipart/form-data">
+      <div class="form-group">
+        <label for="compareFile1">First Image:</label>
+        <input type="file" id="compareFile1" name="file1" accept=".jpg,.jpeg,.png" required class="form-control">
+      </div>
+
+      <div class="form-group">
+        <label for="compareFile2">Second Image:</label>
+        <input type="file" id="compareFile2" name="file2" accept=".jpg,.jpeg,.png" required class="form-control">
+      </div>
+
+      <button type="button" onclick="compareFaces()" class="btn btn-primary">Compare Faces</button>
+    </form>
+
+    <div id="comparisonResults" class="result-section"></div>
+  </div>
+</div>

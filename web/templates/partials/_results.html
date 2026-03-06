@@ -1,0 +1,91 @@
+{% if error or face_count is not none or detection_message or analysis_report or face_details or output_url %}
+<div class="panel result-section">
+  {% if error %}
+    <div class="notice error">Error: {{ error }}</div>
+  {% endif %}
+
+  {% if face_count is not none %}
+    <div class="notice success">Detection complete. Found {{ face_count }} face(s).</div>
+  {% endif %}
+
+  {% if detection_message %}
+    <div class="notice detection-info">{{ detection_message }}</div>
+  {% endif %}
+
+  {% if analysis_report %}
+    <div class="analysis-summary">
+      <h3>Analysis Summary</h3>
+      <div class="stat-grid">
+        <div class="stat-item">
+          <div class="stat-number">{{ analysis_report.total_faces }}</div>
+          <div class="stat-label">Total Faces</div>
+        </div>
+        {% if analysis_report.average_age %}
+        <div class="stat-item">
+          <div class="stat-number">{{ analysis_report.average_age }}</div>
+          <div class="stat-label">Avg Age</div>
+        </div>
+        {% endif %}
+        {% if analysis_report.gender_distribution %}
+        <div class="stat-item">
+          <div class="stat-number">
+            {% for gender, count in analysis_report.gender_distribution.items() %}
+              {{ gender }}: {{ count }}{% if not loop.last %}<br>{% endif %}
+            {% endfor %}
+          </div>
+          <div class="stat-label">Gender Dist.</div>
+        </div>
+        {% endif %}
+        {% if analysis_report.emotion_distribution %}
+        <div class="stat-item">
+          <div class="stat-number">
+            {% for emotion, count in analysis_report.emotion_distribution.items() %}
+              {{ emotion }}: {{ count }}{% if not loop.last %}<br>{% endif %}
+            {% endfor %}
+          </div>
+          <div class="stat-label">Emotions</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+
+  {% if face_details %}
+    <div class="face-analysis">
+      {% for face in face_details %}
+      <div class="face-card">
+        <div style="text-align: center;">
+          {% if face_crops and face_crops[loop.index0] and face_crops[loop.index0].image %}
+          <img src="{{ face_crops[loop.index0].image }}" alt="Face {{ face.id }}" class="face-crop">
+          {% endif %}
+        </div>
+        <div class="face-details">
+          <h4>Face {{ face.id }}</h4>
+          <p><strong>Method:</strong> {{ face.method }}</p>
+          <p><strong>Confidence:</strong> {{ "%.2f"|format(face.confidence) }}</p>
+          {% if face.age and face.age != 'Unknown' %}
+          <p><strong>Age:</strong> {{ face.age }} years</p>
+          {% endif %}
+          {% if face.gender and face.gender != 'Unknown' %}
+          <p><strong>Gender:</strong> {{ face.gender }}</p>
+          {% endif %}
+          {% if face.emotion and face.emotion != 'Unknown' %}
+          <p><strong>Emotion:</strong> {{ face.emotion }}</p>
+          {% endif %}
+          {% if face.race and face.race != 'Unknown' %}
+          <p><strong>Ethnicity:</strong> {{ face.race }}</p>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {% if output_url %}
+    <img src="{{ output_url }}" alt="Processed image with detected faces" class="result-image">
+    <div style="margin-top:12px;">
+      <a href="{{ output_url }}" download="face_detection_result.jpg" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none;">&#11015; Download Result</a>
+    </div>
+  {% endif %}
+</div>
+{% endif %}

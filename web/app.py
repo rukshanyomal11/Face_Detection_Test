@@ -3,6 +3,7 @@ import sys
 import uuid
 import cv2
 import json
+import base64
 import numpy as np
 from typing import List, Optional
 from fastapi import FastAPI, UploadFile, File, Request, Form, HTTPException
@@ -248,6 +249,94 @@ async def get_analysis_data(image_id: str):
             status_code=500,
             content={"success": False, "error": str(e)}
         )
+
+
+@app.post("/api/detect", response_class=JSONResponse)
+async def detect_api(
+    file: UploadFile = File(...),
+    analysis_mode: str = Form("basic"),
+    min_confidence: float = Form(0.3),
+    return_crops: bool = Form(False)
+):
+    """
+    JSON API endpoint for face detection
+    """
+    try:
+        if file.content_type not in ["image/jpeg", "image/png", "image/jpg"]:
+            raise HTTPException(status_code=400, detail="Invalid file type. Use JPEG or PNG.")
+
+        content = await file.read()
+        img_array = np.frombuffer(content, dtype=np.uint8)
+        img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+
+        if img is None:
+            raise HTTPException(status_code=400, detail="Could not decode image.")
+
+        out_img, face_count, face_details = detect_and_draw_faces(
+            img, min_conf=min_confidence, analysis_mode=analysis_mode
+        )
+
+        out_name = f"{uuid.uuid4().hex}.jpg"
+        out_path = os.path.join(OUTPUT_DIR, out_name)
+        cv2.imwrite(out_path, out_img, [cv2.IMWRITE_JPEG_QUALITY, 95])
+
+        response_data = {
+            "success": True,
+            "face_count": face_count,
+            "output_url": f"/static/outputs/{out_name}",
+            "faces": face_details,
+            "analysis_report": generate_face_analysis_report(face_details)
+        }
+
+        if return_crops:
+            response_data["face_crops"] = extract_face_crops(
+                img,
+                [{"bbox": f["bbox"], "confidence": f["confidence"], "method": f["method"]} for f in face_details]
+            )
+
+        return JSONResponse(content=response_data)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+
+
+@app.post("/api/webcam-detect", response_class=JSONResponse)
+async def webcam_detect(
+    file: UploadFile = File(...),
+    min_confidence: float = Form(0.3)
+):
+    """
+    Process a single webcam frame and return the annotated image as base64
+    """
+    try:
+        content = await file.read()
+        img_array = np.frombuffer(content, dtype=np.uint8)
+        img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+
+        if img is None:
+            return JSONResponse(content={"success": False, "error": "Could not decode frame"})
+
+        out_img, face_count, face_details = detect_and_draw_faces(
+            img, min_conf=min_confidence, analysis_mode="basic"
+        )
+
+        _, buffer = cv2.imencode(".jpg", out_img, [cv2.IMWRITE_JPEG_QUALITY, 85])
+        frame_b64 = base64.b64encode(buffer).decode("utf-8")
+
+        return JSONResponse(content={
+            "success": True,
+            "face_count": face_count,
+            "frame": f"data:image/jpeg;base64,{frame_b64}",
+            "faces": [
+                {"id": f["id"], "confidence": round(f["confidence"], 2), "method": f["method"]}
+                for f in face_details
+            ]
+        })
+
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
 
 
 @app.post("/api/detect", response_class=JSONResponse)

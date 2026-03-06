@@ -1,0 +1,199 @@
+<script>
+  function showTab(event, tabName) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+    document.getElementById(tabName + '-tab').classList.add('active');
+    if (event && event.target) event.target.classList.add('active');
+  }
+
+  // ── Single image: file preview ──────────────────────────────────────────────
+  document.getElementById('fileInput').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    const fileName = file?.name || 'No file selected';
+    document.querySelector('.file-label').textContent = '\uD83D\uDCF7 ' + fileName;
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = function(ev) {
+        document.getElementById('previewImage').src = ev.target.result;
+        document.getElementById('imagePreview').style.display = 'block';
+      };
+      reader.readAsDataURL(file);
+    } else {
+      document.getElementById('imagePreview').style.display = 'none';
+    }
+  });
+
+  // ── Single image: confidence slider ─────────────────────────────────────────
+  const confidenceSlider = document.getElementById('minConfidence');
+  const confidenceValue  = document.getElementById('confidenceValue');
+  confidenceSlider.addEventListener('input', function() {
+    confidenceValue.textContent = this.value;
+  });
+
+  // ── Single image: loading state ──────────────────────────────────────────────
+  document.getElementById('uploadForm').addEventListener('submit', function() {
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('uploadBtn').disabled = true;
+    document.getElementById('uploadBtn').textContent = 'Processing...';
+  });
+
+  // ── Batch processing ─────────────────────────────────────────────────────────
+  async function processBatch() {
+    const form = document.getElementById('batchForm');
+    const formData = new FormData(form);
+    const resultsDiv = document.getElementById('batchResults');
+
+    try {
+      resultsDiv.innerHTML = '<div class="loading" style="display:block;"><div class="spinner"></div><p>Processing batch...</p></div>';
+
+      const response = await fetch('/batch-upload', { method: 'POST', body: formData });
+      const data = await response.json();
+
+      if (data.success) {
+        let html = `<div class="notice success">Batch complete: ${data.total_processed} images processed.</div>`;
+        data.results.forEach((result, index) => {
+          html += `
+            <div class="face-card">
+              <h4>Image ${index + 1}</h4>
+              <p><strong>Faces Detected:</strong> ${result.face_count}</p>
+              ${result.error ? `<div class="notice error">Error: ${result.error}</div>` : ''}
+              ${result.output_url ? `<img src="${result.output_url}" style="max-width:100%; border-radius:10px; margin-top:8px; display:block;">` : ''}
+            </div>`;
+        });
+        resultsDiv.innerHTML = html;
+      } else {
+        resultsDiv.innerHTML = `<div class="notice error">Error: ${data.error}</div>`;
+      }
+    } catch (error) {
+      resultsDiv.innerHTML = `<div class="notice error">Network Error: ${error.message}</div>`;
+    }
+  }
+
+  // ── Face comparison ───────────────────────────────────────────────────────────
+  async function compareFaces() {
+    const form = document.getElementById('compareForm');
+    const formData = new FormData(form);
+    const resultsDiv = document.getElementById('comparisonResults');
+
+    try {
+      resultsDiv.innerHTML = '<div class="loading" style="display:block;"><div class="spinner"></div><p>Comparing faces...</p></div>';
+
+      const response = await fetch('/compare-faces', { method: 'POST', body: formData });
+      const data = await response.json();
+
+      if (data.success) {
+        const comparison = data.comparison;
+        const similarity = Math.round(comparison.similarity * 100);
+        const scoreClass = similarity > 70 ? 'similarity-high' : similarity > 40 ? 'similarity-medium' : 'similarity-low';
+        resultsDiv.innerHTML = `
+          <div class="comparison-result">
+            <h3>Face Comparison Results</h3>
+            <div class="similarity-score ${scoreClass}">${similarity}% Similar</div>
+            <p><strong>Are Same Person:</strong> ${comparison.are_same ? 'Yes' : 'No'}</p>
+            <p><strong>Distance Score:</strong> ${comparison.distance?.toFixed(3) || 'N/A'}</p>
+            ${comparison.error ? `<div class="notice error">Note: ${comparison.error}</div>` : ''}
+          </div>`;
+      } else {
+        resultsDiv.innerHTML = `<div class="notice error">Error: ${data.error}</div>`;
+      }
+    } catch (error) {
+      resultsDiv.innerHTML = `<div class="notice error">Network Error: ${error.message}</div>`;
+    }
+  }
+
+  // ── API test helper ───────────────────────────────────────────────────────────
+  async function testAPI() {
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.jpg,.jpeg,.png';
+    fileInput.addEventListener('change', async function() {
+      if (this.files.length === 0) return;
+      const formData = new FormData();
+      formData.append('file', this.files[0]);
+      formData.append('analysis_mode', 'advanced');
+      formData.append('min_confidence', '0.3');
+      formData.append('return_crops', 'true');
+      try {
+        const response = await fetch('/api/detect', { method: 'POST', body: formData });
+        const data = await response.json();
+        console.log('API Response:', data);
+        alert('API test successful. Check console for full response.');
+      } catch (error) {
+        console.error('API Error:', error);
+        alert('API test failed: ' + error.message);
+      }
+    });
+    fileInput.click();
+  }
+
+  // ── Webcam confidence slider ──────────────────────────────────────────────────
+  document.getElementById('webcamConfidence').addEventListener('input', function() {
+    document.getElementById('webcamConfidenceValue').textContent = this.value;
+  });
+
+  // ── Webcam live detection ─────────────────────────────────────────────────────
+  let _webcamStream   = null;
+  let _webcamInterval = null;
+  let _webcamBusy     = false;
+
+  async function startWebcam() {
+    try {
+      _webcamStream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+      const video = document.getElementById('webcamVideo');
+      video.srcObject = _webcamStream;
+      document.getElementById('stopWebcamBtn').disabled = false;
+      _webcamInterval = setInterval(captureAndDetect, 1200);
+    } catch (err) {
+      alert('Camera access denied or unavailable: ' + err.message);
+    }
+  }
+
+  function stopWebcam() {
+    if (_webcamStream) {
+      _webcamStream.getTracks().forEach(t => t.stop());
+      _webcamStream = null;
+    }
+    clearInterval(_webcamInterval);
+    _webcamInterval = null;
+    _webcamBusy = false;
+    document.getElementById('webcamVideo').srcObject = null;
+    document.getElementById('stopWebcamBtn').disabled = true;
+    document.getElementById('webcamStatus').style.display = 'none';
+    document.getElementById('webcamResult').innerHTML = '<span>Detection output will appear here</span>';
+  }
+
+  async function captureAndDetect() {
+    if (_webcamBusy || !_webcamStream) return;
+    const video = document.getElementById('webcamVideo');
+    if (video.videoWidth === 0) return;
+    _webcamBusy = true;
+
+    const canvas = document.getElementById('webcamCanvas');
+    canvas.width  = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+
+    canvas.toBlob(async (blob) => {
+      try {
+        const fd = new FormData();
+        fd.append('file', blob, 'frame.jpg');
+        fd.append('min_confidence', document.getElementById('webcamConfidence').value);
+
+        const res  = await fetch('/api/webcam-detect', { method: 'POST', body: fd });
+        const data = await res.json();
+
+        if (data.success) {
+          document.getElementById('webcamResult').innerHTML =
+            `<img src="${data.frame}" style="width:100%; border-radius:14px; display:block;">`;
+          const status = document.getElementById('webcamStatus');
+          status.style.display = 'block';
+          status.textContent = `Detected ${data.face_count} face(s)`;
+        }
+      } catch (e) {
+        console.error('Webcam detection error:', e);
+      } finally {
+        _webcamBusy = false;
+      }
+    }, 'image/jpeg', 0.85);
+  }
+</script>

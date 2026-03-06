@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Face Detection Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #0f172a;
+      --muted: #5b677a;
+      --brand: #0f766e;
+      --brand-2: #2563eb;
+      --accent: #f59e0b;
+      --surface: #ffffff;
+      --surface-2: #f8fafc;
+      --border: #e2e8f0;
+      --shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+      --shadow-soft: 0 12px 30px rgba(15, 23, 42, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "IBM Plex Sans", "Segoe UI", Arial, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(900px 500px at 10% -10%, rgba(37, 99, 235, 0.18), transparent 60%),
+        radial-gradient(800px 400px at 90% 10%, rgba(15, 118, 110, 0.18), transparent 55%),
+        linear-gradient(160deg, #f8fafc 0%, #f1f5f9 45%, #fff7ed 100%);
+      min-height: 100vh;
+    }
+
+    .page {
+      padding: 40px 20px 64px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: rgba(255, 255, 255, 0.94);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      backdrop-filter: blur(12px);
+    }
+
+    .header {
+      padding: 56px 56px 44px;
+      color: #fff;
+      background: linear-gradient(120deg, #0f766e 0%, #2563eb 60%, #0ea5e9 100%);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .header::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(600px 240px at 80% 0%, rgba(255, 255, 255, 0.25), transparent 60%);
+      opacity: 0.9;
+    }
+
+    .header > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      font-size: 0.72rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    .header h1 {
+      font-family: "Space Grotesk", "Segoe UI", Arial, sans-serif;
+      font-size: 2.6rem;
+      margin: 16px 0 12px;
+      letter-spacing: -0.02em;
+    }
+
+    .header p {
+      margin: 0;
+      max-width: 680px;
+      font-size: 1.08rem;
+      line-height: 1.6;
+      opacity: 0.92;
+    }
+
+    .header-meta {
+      margin-top: 22px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .meta-pill {
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      background: rgba(255, 255, 255, 0.16);
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+
+    .content {
+      padding: 36px 48px 56px;
+      display: grid;
+      gap: 28px;
+    }
+
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 18px;
+    }
+
+    .feature {
+      background: var(--surface);
+      border-radius: 18px;
+      border: 1px solid var(--border);
+      padding: 18px;
+      box-shadow: var(--shadow-soft);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .feature:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 18px 32px rgba(15, 23, 42, 0.14);
+    }
+
+    .feature-icon {
+      width: 46px;
+      height: 46px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      font-family: "Space Grotesk", "Segoe UI", Arial, sans-serif;
+      font-weight: 700;
+      color: #0f172a;
+      background: linear-gradient(135deg, rgba(15, 118, 110, 0.2), rgba(37, 99, 235, 0.22));
+      margin-bottom: 12px;
+    }
+
+    .feature h3 {
+      margin: 0 0 6px;
+      font-size: 1.05rem;
+    }
+
+    .feature p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .tab-navigation {
+      display: flex;
+      gap: 6px;
+      padding: 6px;
+      background: var(--surface-2);
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+
+    .tab {
+      flex: 1 1 160px;
+      padding: 12px 16px;
+      border-radius: 999px;
+      border: none;
+      background: transparent;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .tab.active {
+      background: linear-gradient(135deg, rgba(15, 118, 110, 0.2), rgba(37, 99, 235, 0.2));
+      color: var(--ink);
+      box-shadow: inset 0 0 0 1px rgba(15, 118, 110, 0.45);
+    }
+
+    .tab:hover {
+      color: var(--ink);
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .upload-section {
+      text-align: left;
+    }
+
+    .form-group {
+      margin: 16px 0;
+      text-align: left;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: var(--ink);
+    }
+
+    .form-control {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      font-size: 1rem;
+      background: #fff;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .form-control:focus {
+      outline: none;
+      border-color: rgba(15, 118, 110, 0.6);
+      box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.16);
+    }
+
+    input[type="range"].form-control {
+      padding: 6px 4px;
+      accent-color: var(--brand);
+    }
+
+    .file-input {
+      display: none;
+    }
+
+    .file-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 20px;
+      background: rgba(15, 118, 110, 0.08);
+      color: var(--ink);
+      border-radius: 999px;
+      border: 1px dashed rgba(15, 118, 110, 0.5);
+      cursor: pointer;
+      font-size: 0.98rem;
+      font-weight: 600;
+      transition: all 0.2s ease;
+    }
+
+    .file-label:hover {
+      border-color: rgba(37, 99, 235, 0.6);
+      background: rgba(37, 99, 235, 0.12);
+      transform: translateY(-1px);
+    }
+
+    .btn {
+      padding: 12px 22px;
+      border: none;
+      border-radius: 12px;
+      font-size: 1rem;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      margin: 4px 0;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #0f766e 0%, #2563eb 100%);
+      color: white;
+      box-shadow: 0 10px 18px rgba(37, 99, 235, 0.2);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 16px 26px rgba(37, 99, 235, 0.25);
+    }
+
+    .btn-secondary {
+      background: #0f172a;
+      color: white;
+    }
+
+    .btn:disabled {
+      background: #94a3b8;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .result-section {
+      display: grid;
+      gap: 16px;
+    }
+
+    .notice {
+      border-radius: 12px;
+      padding: 14px 16px;
+      border: 1px solid;
+    }
+
+    .error {
+      color: #991b1b;
+      background: #fef2f2;
+      border-color: #fecaca;
+    }
+
+    .success {
+      color: #065f46;
+      background: #ecfdf3;
+      border-color: #a7f3d0;
+      font-weight: 600;
+    }
+
+    .detection-info {
+      color: #1e3a8a;
+      background: #eff6ff;
+      border-color: #bfdbfe;
+    }
+
+    .result-image {
+      max-width: 100%;
+      margin-top: 12px;
+      border-radius: 16px;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .analysis-summary {
+      background: var(--surface-2);
+      border-radius: 16px;
+      padding: 18px;
+      border: 1px solid var(--border);
+    }
+
+    .analysis-summary h3 {
+      margin-top: 0;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+      margin: 14px 0 0;
+    }
+
+    .stat-item {
+      text-align: center;
+      padding: 14px;
+      background: white;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
+
+    .stat-number {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--brand-2);
+      font-family: "Space Grotesk", "Segoe UI", Arial, sans-serif;
+    }
+
+    .stat-label {
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .face-analysis {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin: 18px 0 0;
+    }
+
+    .face-card {
+      background: white;
+      border-radius: 16px;
+      padding: 18px;
+      box-shadow: var(--shadow-soft);
+      border: 1px solid var(--border);
+    }
+
+    .face-crop {
+      width: 96px;
+      height: 96px;
+      object-fit: cover;
+      border-radius: 50%;
+      margin-bottom: 10px;
+      border: 2px solid rgba(15, 118, 110, 0.3);
+    }
+
+    .face-details h4 {
+      margin: 0 0 10px 0;
+      color: var(--ink);
+    }
+
+    .face-details p {
+      margin: 6px 0;
+      color: var(--muted);
+    }
+
+    .loading {
+      display: none;
+      text-align: center;
+      margin: 16px 0;
+    }
+
+    .spinner {
+      border: 3px solid #e2e8f0;
+      border-top: 3px solid var(--brand-2);
+      border-radius: 50%;
+      width: 36px;
+      height: 36px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 12px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .comparison-result {
+      background: white;
+      border-radius: 16px;
+      padding: 18px;
+      margin: 16px 0 0;
+      box-shadow: var(--shadow-soft);
+      border: 1px solid var(--border);
+    }
+
+    .similarity-score {
+      font-size: 2.2rem;
+      font-weight: 700;
+      text-align: center;
+      margin: 12px 0;
+      font-family: "Space Grotesk", "Segoe UI", Arial, sans-serif;
+    }
+
+    .similarity-high { color: #059669; }
+    .similarity-medium { color: #d97706; }
+    .similarity-low { color: #dc2626; }
+
+    .api-panel h4 {
+      margin-bottom: 6px;
+    }
+
+    .api-panel ul {
+      margin-top: 6px;
+      padding-left: 18px;
+      color: var(--muted);
+    }
+
+    a {
+      color: var(--brand-2);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    @media (max-width: 900px) {
+      .header {
+        padding: 40px 32px;
+      }
+
+      .content {
+        padding: 28px 26px 40px;
+      }
+
+      .tab {
+        flex: 1 1 100%;
+      }
+    }
+
+    @media (max-width: 600px) {
+      .header h1 {
+        font-size: 2rem;
+      }
+
+      .page {
+        padding: 24px 12px 40px;
+      }
+
+      .panel {
+        padding: 18px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="container">
+      <header class="header">
+        <div class="badge">AI Vision Suite</div>
+        <h1>Advanced Face Detection</h1>
+        <p>Multi-model face analysis with MediaPipe and MTCNN. Detect, analyze, and compare faces in seconds with configurable thresholds and rich reports.</p>
+        <div class="header-meta">
+          <span class="meta-pill">MediaPipe</span>
+          <span class="meta-pill">MTCNN</span>
+          <span class="meta-pill">Age and Emotion</span>
+          <span class="meta-pill">Batch Ready</span>
+        </div>
+      </header>
+
+      <div class="content">
+        <section class="features">
+          <div class="feature">
+            <div class="feature-icon">MP</div>
+            <h3>MediaPipe AI</h3>
+            <p>Google's optimized detection model for fast, accurate results.</p>
+          </div>
+          <div class="feature">
+            <div class="feature-icon">NN</div>
+            <h3>MTCNN</h3>
+            <p>Multi-task CNN that excels on small and complex faces.</p>
+          </div>
+          <div class="feature">
+            <div class="feature-icon">AN</div>
+            <h3>Advanced Analysis</h3>
+            <p>Age, gender, emotion and landmark insights on demand.</p>
+          </div>
+          <div class="feature">
+            <div class="feature-icon">BP</div>
+            <h3>Batch Processing</h3>
+            <p>Process up to 10 images in one streamlined run.</p>
+          </div>
+        </section>
+
+        <div class="tab-navigation">
+          <button class="tab active" onclick="showTab(event, 'single')">Single Image</button>
+          <button class="tab" onclick="showTab(event, 'batch')">Batch Processing</button>
+          <button class="tab" onclick="showTab(event, 'compare')">Face Comparison</button>
+          <button class="tab" onclick="showTab(event, 'api')">API Documentation</button>
+          <button class="tab" onclick="showTab(event, 'webcam')">&#127909; Live Webcam</button>
+        </div>
+
+        <div id="single-tab" class="tab-content active">
+          <div class="panel upload-section">
+            <form id="uploadForm" action="/upload" method="post" enctype="multipart/form-data">
+              <div class="form-group">
+                <input type="file" id="fileInput" name="file" accept=".jpg,.jpeg,.png" required class="file-input">
+                <label for="fileInput" class="file-label">&#128247; Choose Image</label>
+                <div id="imagePreview" style="display:none; margin-top:12px;">
+                  <p style="font-weight:600; margin:0 0 6px; font-size:0.87rem; color:var(--muted);">Preview</p>
+                  <img id="previewImage" alt="Selected image preview" style="max-width:100%; max-height:280px; border-radius:12px; border:1px solid var(--border); object-fit:contain; display:block;">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="analysisMode">Analysis Mode:</label>
+                <select name="analysis_mode" id="analysisMode" class="form-control">
+                  <option value="basic">Basic Detection</option>
+                  <option value="advanced">Advanced Analysis (Age, Gender, Emotion)</option>
+                  <option value="landmarks">Facial Landmarks</option>
+                  <option value="full">Complete Analysis</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="minConfidence">Detection Confidence (0.1 - 1.0):</label>
+                <input type="range" name="min_confidence" id="minConfidence" min="0.1" max="1.0" step="0.1" value="0.3" class="form-control">
+                <span id="confidenceValue">0.3</span>
+              </div>
+
+              <button type="submit" class="btn btn-primary" id="uploadBtn">Analyze Image</button>
+            </form>
+
+            <div class="loading" id="loading">
+              <div class="spinner"></div>
+              <p>Processing with AI models...</p>
+            </div>
+          </div>
+        </div>
+
+        <div id="batch-tab" class="tab-content">
+          <div class="panel upload-section">
+            <form id="batchForm" enctype="multipart/form-data">
+              <div class="form-group">
+                <label for="batchFiles">Select Multiple Images (Max 10):</label>
+                <input type="file" id="batchFiles" name="files" accept=".jpg,.jpeg,.png" multiple required class="form-control">
+              </div>
+
+              <div class="form-group">
+                <label for="batchAnalysisMode">Analysis Mode:</label>
+                <select name="analysis_mode" id="batchAnalysisMode" class="form-control">
+                  <option value="basic">Basic Detection</option>
+                  <option value="advanced">Advanced Analysis</option>
+                  <option value="full">Complete Analysis</option>
+                </select>
+              </div>
+
+              <button type="button" onclick="processBatch()" class="btn btn-primary">Process Batch</button>
+            </form>
+
+            <div id="batchResults" class="result-section"></div>
+          </div>
+        </div>
+
+        <div id="compare-tab" class="tab-content">
+          <div class="panel upload-section">
+            <form id="compareForm" enctype="multipart/form-data">
+              <div class="form-group">
+                <label for="compareFile1">First Image:</label>
+                <input type="file" id="compareFile1" name="file1" accept=".jpg,.jpeg,.png" required class="form-control">
+              </div>
+
+              <div class="form-group">
+                <label for="compareFile2">Second Image:</label>
+                <input type="file" id="compareFile2" name="file2" accept=".jpg,.jpeg,.png" required class="form-control">
+              </div>
+
+              <button type="button" onclick="compareFaces()" class="btn btn-primary">Compare Faces</button>
+            </form>
+
+            <div id="comparisonResults" class="result-section"></div>
+          </div>
+        </div>
+
+        <div id="api-tab" class="tab-content">
+          <div class="panel api-panel">
+            <h3>API Endpoints</h3>
+
+            <h4>POST /api/detect</h4>
+            <p><strong>Description:</strong> Detect faces in a single image</p>
+            <p><strong>Parameters:</strong></p>
+            <ul>
+              <li><code>file</code> - Image file (JPEG/PNG)</li>
+              <li><code>analysis_mode</code> - basic, advanced, landmarks, full</li>
+              <li><code>min_confidence</code> - Detection threshold (0.1-1.0)</li>
+              <li><code>return_crops</code> - Include face crops in response</li>
+            </ul>
+
+            <h4>POST /batch-upload</h4>
+            <p><strong>Description:</strong> Process multiple images</p>
+            <p><strong>Parameters:</strong></p>
+            <ul>
+              <li><code>files</code> - Array of image files (max 10)</li>
+              <li><code>analysis_mode</code> - Analysis mode</li>
+              <li><code>min_confidence</code> - Detection threshold</li>
+            </ul>
+
+            <h4>POST /compare-faces</h4>
+            <p><strong>Description:</strong> Compare two faces for similarity</p>
+            <p><strong>Parameters:</strong></p>
+            <ul>
+              <li><code>file1</code> - First image file</li>
+              <li><code>file2</code> - Second image file</li>
+            </ul>
+
+            <h4>POST /api/webcam-detect</h4>
+            <p><strong>Description:</strong> Process a single webcam frame and return annotated image as base64</p>
+            <p><strong>Parameters:</strong></p>
+            <ul>
+              <li><code>file</code> - JPEG frame blob</li>
+              <li><code>min_confidence</code> - Detection threshold (0.1-1.0)</li>
+            </ul>
+          </div>
+        </div>
+
+        <div id="webcam-tab" class="tab-content">
+          <div class="panel upload-section">
+            <div class="form-group">
+              <label for="webcamConfidence">Detection Confidence: <span id="webcamConfidenceValue">0.3</span></label>
+              <input type="range" id="webcamConfidence" min="0.1" max="1.0" step="0.1" value="0.3" class="form-control">
+            </div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px;">
+              <button class="btn btn-primary" onclick="startWebcam()">&#9654; Start Camera</button>
+              <button class="btn btn-secondary" onclick="stopWebcam()" id="stopWebcamBtn" disabled>&#9646;&#9646; Stop Camera</button>
+            </div>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px,1fr)); gap:16px;">
+              <div>
+                <p style="font-weight:600; margin:0 0 8px; font-size:0.95rem;">Live Feed</p>
+                <video id="webcamVideo" autoplay playsinline muted style="width:100%; border-radius:14px; background:#0f172a; display:block;"></video>
+                <canvas id="webcamCanvas" style="display:none;"></canvas>
+              </div>
+              <div>
+                <p style="font-weight:600; margin:0 0 8px; font-size:0.95rem;">Detection Output</p>
+                <div id="webcamResult" style="width:100%; min-height:180px; background:var(--surface-2); border-radius:14px; border:1px solid var(--border); display:flex; align-items:center; justify-content:center; color:var(--muted); overflow:hidden;">
+                  <span>Detection output will appear here</span>
+                </div>
+              </div>
+            </div>
+            <div id="webcamStatus" class="notice detection-info" style="display:none; margin-top:12px;"></div>
+          </div>
+        </div>
+
+        {% if error or face_count is not none or detection_message or analysis_report or face_details or output_url %}
+        <div class="panel result-section">
+          {% if error %}
+            <div class="notice error">Error: {{ error }}</div>
+          {% endif %}
+
+          {% if face_count is not none %}
+            <div class="notice success">Detection complete. Found {{ face_count }} face(s).</div>
+          {% endif %}
+
+          {% if detection_message %}
+            <div class="notice detection-info">{{ detection_message }}</div>
+          {% endif %}
+
+          {% if analysis_report %}
+            <div class="analysis-summary">
+              <h3>Analysis Summary</h3>
+              <div class="stat-grid">
+                <div class="stat-item">
+                  <div class="stat-number">{{ analysis_report.total_faces }}</div>
+                  <div class="stat-label">Total Faces</div>
+                </div>
+                {% if analysis_report.average_age %}
+                <div class="stat-item">
+                  <div class="stat-number">{{ analysis_report.average_age }}</div>
+                  <div class="stat-label">Avg Age</div>
+                </div>
+                {% endif %}
+                {% if analysis_report.gender_distribution %}
+                <div class="stat-item">
+                  <div class="stat-number">
+                    {% for gender, count in analysis_report.gender_distribution.items() %}
+                      {{ gender }}: {{ count }}{% if not loop.last %}<br>{% endif %}
+                    {% endfor %}
+                  </div>
+                  <div class="stat-label">Gender Dist.</div>
+                </div>
+                {% endif %}
+                {% if analysis_report.emotion_distribution %}
+                <div class="stat-item">
+                  <div class="stat-number">
+                    {% for emotion, count in analysis_report.emotion_distribution.items() %}
+                      {{ emotion }}: {{ count }}{% if not loop.last %}<br>{% endif %}
+                    {% endfor %}
+                  </div>
+                  <div class="stat-label">Emotions</div>
+                </div>
+                {% endif %}
+              </div>
+            </div>
+          {% endif %}
+
+          {% if face_details %}
+            <div class="face-analysis">
+              {% for face in face_details %}
+              <div class="face-card">
+                <div style="text-align: center;">
+                  {% if face_crops and face_crops[loop.index0] and face_crops[loop.index0].image %}
+                  <img src="{{ face_crops[loop.index0].image }}" alt="Face {{ face.id }}" class="face-crop">
+                  {% endif %}
+                </div>
+                <div class="face-details">
+                  <h4>Face {{ face.id }}</h4>
+                  <p><strong>Method:</strong> {{ face.method }}</p>
+                  <p><strong>Confidence:</strong> {{ "%.2f"|format(face.confidence) }}</p>
+                  {% if face.age and face.age != 'Unknown' %}
+                  <p><strong>Age:</strong> {{ face.age }} years</p>
+                  {% endif %}
+                  {% if face.gender and face.gender != 'Unknown' %}
+                  <p><strong>Gender:</strong> {{ face.gender }}</p>
+                  {% endif %}
+                  {% if face.emotion and face.emotion != 'Unknown' %}
+                  <p><strong>Emotion:</strong> {{ face.emotion }}</p>
+                  {% endif %}
+                  {% if face.race and face.race != 'Unknown' %}
+                  <p><strong>Ethnicity:</strong> {{ face.race }}</p>
+                  {% endif %}
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+
+          {% if output_url %}
+            <img src="{{ output_url }}" alt="Processed image with detected faces" class="result-image">
+            <div style="margin-top:12px;">
+              <a href="{{ output_url }}" download="face_detection_result.jpg" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none;">&#11015; Download Result</a>
+            </div>
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function showTab(event, tabName) {
+      const tabs = document.querySelectorAll('.tab-content');
+      tabs.forEach(tab => tab.classList.remove('active'));
+
+      const tabButtons = document.querySelectorAll('.tab');
+      tabButtons.forEach(btn => btn.classList.remove('active'));
+
+      document.getElementById(tabName + '-tab').classList.add('active');
+      if (event && event.target) {
+        event.target.classList.add('active');
+      }
+    }
+
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      const fileName = file?.name || 'No file selected';
+      document.querySelector('.file-label').textContent = '\uD83D\uDCF7 ' + fileName;
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(ev) {
+          document.getElementById('previewImage').src = ev.target.result;
+          document.getElementById('imagePreview').style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+      } else {
+        document.getElementById('imagePreview').style.display = 'none';
+      }
+    });
+
+    const confidenceSlider = document.getElementById('minConfidence');
+    const confidenceValue = document.getElementById('confidenceValue');
+
+    confidenceSlider.addEventListener('input', function() {
+      confidenceValue.textContent = this.value;
+    });
+
+    document.getElementById('uploadForm').addEventListener('submit', function() {
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('uploadBtn').disabled = true;
+      document.getElementById('uploadBtn').textContent = 'Processing...';
+    });
+
+    async function processBatch() {
+      const form = document.getElementById('batchForm');
+      const formData = new FormData(form);
+      const resultsDiv = document.getElementById('batchResults');
+
+      try {
+        resultsDiv.innerHTML = '<div class="loading"><div class="spinner"></div><p>Processing batch...</p></div>';
+
+        const response = await fetch('/batch-upload', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          let html = `<div class="notice success">Batch complete: ${data.total_processed} images processed.</div>`;
+
+          data.results.forEach((result, index) => {
+            html += `
+              <div class="face-card">
+                <h4>Image ${index + 1}</h4>
+                <p><strong>Faces Detected:</strong> ${result.face_count}</p>
+                ${result.error ? `<div class="notice error">Error: ${result.error}</div>` : ''}
+                ${result.output_url ? `<img src="${result.output_url}" style="max-width:100%; border-radius:10px; margin-top:8px; display:block;">` : ''}
+              </div>
+            `;
+          });
+
+          resultsDiv.innerHTML = html;
+        } else {
+          resultsDiv.innerHTML = `<div class="notice error">Error: ${data.error}</div>`;
+        }
+      } catch (error) {
+        resultsDiv.innerHTML = `<div class="notice error">Network Error: ${error.message}</div>`;
+      }
+    }
+
+    async function compareFaces() {
+      const form = document.getElementById('compareForm');
+      const formData = new FormData(form);
+      const resultsDiv = document.getElementById('comparisonResults');
+
+      try {
+        resultsDiv.innerHTML = '<div class="loading"><div class="spinner"></div><p>Comparing faces...</p></div>';
+
+        const response = await fetch('/compare-faces', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          const comparison = data.comparison;
+          const similarity = Math.round(comparison.similarity * 100);
+          const scoreClass = similarity > 70 ? 'similarity-high' : similarity > 40 ? 'similarity-medium' : 'similarity-low';
+
+          const html = `
+            <div class="comparison-result">
+              <h3>Face Comparison Results</h3>
+              <div class="similarity-score ${scoreClass}">
+                ${similarity}% Similar
+              </div>
+              <p><strong>Are Same Person:</strong> ${comparison.are_same ? 'Yes' : 'No'}</p>
+              <p><strong>Distance Score:</strong> ${comparison.distance?.toFixed(3) || 'N/A'}</p>
+              ${comparison.error ? `<div class="notice error">Note: ${comparison.error}</div>` : ''}
+            </div>
+          `;
+
+          resultsDiv.innerHTML = html;
+        } else {
+          resultsDiv.innerHTML = `<div class="notice error">Error: ${data.error}</div>`;
+        }
+      } catch (error) {
+        resultsDiv.innerHTML = `<div class="notice error">Network Error: ${error.message}</div>`;
+      }
+    }
+
+    async function testAPI() {
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.accept = '.jpg,.jpeg,.png';
+
+      fileInput.addEventListener('change', async function() {
+        if (this.files.length === 0) return;
+
+        const formData = new FormData();
+        formData.append('file', this.files[0]);
+        formData.append('analysis_mode', 'advanced');
+        formData.append('min_confidence', '0.3');
+        formData.append('return_crops', 'true');
+
+        try {
+          const response = await fetch('/api/detect', {
+            method: 'POST',
+            body: formData
+          });
+
+          const data = await response.json();
+          console.log('API Response:', data);
+          alert('API test successful. Check console for full response.');
+        } catch (error) {
+          console.error('API Error:', error);
+          alert('API test failed: ' + error.message);
+        }
+      });
+
+      fileInput.click();
+    }
+
+    // Webcam confidence slider
+    document.getElementById('webcamConfidence').addEventListener('input', function() {
+      document.getElementById('webcamConfidenceValue').textContent = this.value;
+    });
+
+    // Webcam live detection
+    let _webcamStream = null;
+    let _webcamInterval = null;
+    let _webcamBusy = false;
+
+    async function startWebcam() {
+      try {
+        _webcamStream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+        const video = document.getElementById('webcamVideo');
+        video.srcObject = _webcamStream;
+        document.getElementById('stopWebcamBtn').disabled = false;
+        _webcamInterval = setInterval(captureAndDetect, 1200);
+      } catch (err) {
+        alert('Camera access denied or unavailable: ' + err.message);
+      }
+    }
+
+    function stopWebcam() {
+      if (_webcamStream) {
+        _webcamStream.getTracks().forEach(t => t.stop());
+        _webcamStream = null;
+      }
+      clearInterval(_webcamInterval);
+      _webcamInterval = null;
+      _webcamBusy = false;
+      document.getElementById('webcamVideo').srcObject = null;
+      document.getElementById('stopWebcamBtn').disabled = true;
+      document.getElementById('webcamStatus').style.display = 'none';
+      document.getElementById('webcamResult').innerHTML = '<span>Detection output will appear here</span>';
+    }
+
+    async function captureAndDetect() {
+      if (_webcamBusy || !_webcamStream) return;
+      const video = document.getElementById('webcamVideo');
+      if (video.videoWidth === 0) return;
+      _webcamBusy = true;
+
+      const canvas = document.getElementById('webcamCanvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext('2d').drawImage(video, 0, 0);
+
+      canvas.toBlob(async (blob) => {
+        try {
+          const fd = new FormData();
+          fd.append('file', blob, 'frame.jpg');
+          fd.append('min_confidence', document.getElementById('webcamConfidence').value);
+
+          const res = await fetch('/api/webcam-detect', { method: 'POST', body: fd });
+          const data = await res.json();
+
+          if (data.success) {
+            document.getElementById('webcamResult').innerHTML =
+              `<img src="${data.frame}" style="width:100%; border-radius:14px; display:block;">`;
+            const status = document.getElementById('webcamStatus');
+            status.style.display = 'block';
+            status.textContent = `Detected ${data.face_count} face(s)`;
+          }
+        } catch (e) {
+          console.error('Webcam detection error:', e);
+        } finally {
+          _webcamBusy = false;
+        }
+      }, 'image/jpeg', 0.85);
+    }
+  </script>
+</body>
+</html>

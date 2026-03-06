@@ -1,0 +1,40 @@
+<div id="api-tab" class="tab-content">
+  <div class="panel api-panel">
+    <h3>API Endpoints</h3>
+
+    <h4>POST /api/detect</h4>
+    <p><strong>Description:</strong> Detect faces in a single image</p>
+    <p><strong>Parameters:</strong></p>
+    <ul>
+      <li><code>file</code> - Image file (JPEG/PNG)</li>
+      <li><code>analysis_mode</code> - basic, advanced, landmarks, full</li>
+      <li><code>min_confidence</code> - Detection threshold (0.1-1.0)</li>
+      <li><code>return_crops</code> - Include face crops in response</li>
+    </ul>
+
+    <h4>POST /batch-upload</h4>
+    <p><strong>Description:</strong> Process multiple images</p>
+    <p><strong>Parameters:</strong></p>
+    <ul>
+      <li><code>files</code> - Array of image files (max 10)</li>
+      <li><code>analysis_mode</code> - Analysis mode</li>
+      <li><code>min_confidence</code> - Detection threshold</li>
+    </ul>
+
+    <h4>POST /compare-faces</h4>
+    <p><strong>Description:</strong> Compare two faces for similarity</p>
+    <p><strong>Parameters:</strong></p>
+    <ul>
+      <li><code>file1</code> - First image file</li>
+      <li><code>file2</code> - Second image file</li>
+    </ul>
+
+    <h4>POST /api/webcam-detect</h4>
+    <p><strong>Description:</strong> Process a single webcam frame and return annotated image as base64</p>
+    <p><strong>Parameters:</strong></p>
+    <ul>
+      <li><code>file</code> - JPEG frame blob</li>
+      <li><code>min_confidence</code> - Detection threshold (0.1-1.0)</li>
+    </ul>
+  </div>
+</div>

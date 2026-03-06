@@ -1,0 +1,23 @@
+<div id="batch-tab" class="tab-content">
+  <div class="panel upload-section">
+    <form id="batchForm" enctype="multipart/form-data">
+      <div class="form-group">
+        <label for="batchFiles">Select Multiple Images (Max 10):</label>
+        <input type="file" id="batchFiles" name="files" accept=".jpg,.jpeg,.png" multiple required class="form-control">
+      </div>
+
+      <div class="form-group">
+        <label for="batchAnalysisMode">Analysis Mode:</label>
+        <select name="analysis_mode" id="batchAnalysisMode" class="form-control">
+          <option value="basic">Basic Detection</option>
+          <option value="advanced">Advanced Analysis</option>
+          <option value="full">Complete Analysis</option>
+        </select>
+      </div>
+
+      <button type="button" onclick="processBatch()" class="btn btn-primary">Process Batch</button>
+    </form>
+
+    <div id="batchResults" class="result-section"></div>
+  </div>
+</div>
