@@ -34,6 +34,13 @@ app = FastAPI()
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
+def _json_default(obj):
+    if isinstance(obj, (np.integer, np.floating)):
+        return obj.item()
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    return str(obj)
+
 
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
@@ -41,7 +48,9 @@ def home(request: Request):
         "request": request,
         "output_url": None,
         "face_count": None,
-        "error": None
+        "error": None,
+        "analysis_report_json": None,
+        "face_details_json": None
     })
 
 
@@ -58,7 +67,9 @@ async def upload_image(
                 "request": request,
                 "output_url": None,
                 "face_count": None,
-                "error": "Please upload a JPG or PNG image."
+                "error": "Please upload a JPG or PNG image.",
+                "analysis_report_json": None,
+                "face_details_json": None
             })
 
         content = await file.read()
@@ -70,7 +81,9 @@ async def upload_image(
                 "request": request,
                 "output_url": None,
                 "face_count": None,
-                "error": "Could not read the image."
+                "error": "Could not read the image.",
+                "analysis_report_json": None,
+                "face_details_json": None
             })
 
         # Enhanced detection with configurable analysis mode
@@ -90,6 +103,8 @@ async def upload_image(
         
         # Generate analysis report
         analysis_report = generate_face_analysis_report(face_details)
+        analysis_report_json = json.dumps(analysis_report, default=_json_default) if analysis_report else None
+        face_details_json = json.dumps(face_details, default=_json_default) if face_details else None
 
         # Provide detailed feedback based on analysis mode
         if analysis_mode == "basic":
@@ -113,6 +128,8 @@ async def upload_image(
             "face_details": face_details,
             "face_crops": face_crops,
             "analysis_report": analysis_report,
+            "analysis_report_json": analysis_report_json,
+            "face_details_json": face_details_json,
             "error": None
         })
 
@@ -124,7 +141,9 @@ async def upload_image(
             "request": request,
             "output_url": None,
             "face_count": None,
-            "error": error_msg
+            "error": error_msg,
+            "analysis_report_json": None,
+            "face_details_json": None
         })
 
 

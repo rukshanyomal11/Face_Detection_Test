@@ -48,6 +48,17 @@
         {% endif %}
       </div>
     </div>
+
+    <div class="export-actions">
+      <button type="button" class="btn btn-secondary" onclick="exportReport('json')">Export JSON</button>
+      <button type="button" class="btn btn-secondary" onclick="exportReport('csv')">Export CSV</button>
+    </div>
+    {% if analysis_report_json %}
+    <script id="analysis-report-json" type="application/json">{{ analysis_report_json | safe }}</script>
+    {% endif %}
+    {% if face_details_json %}
+    <script id="face-details-json" type="application/json">{{ face_details_json | safe }}</script>
+    {% endif %}
   {% endif %}
 
   {% if face_details %}

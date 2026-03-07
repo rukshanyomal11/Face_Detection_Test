@@ -6,6 +6,110 @@
     if (event && event.target) event.target.classList.add('active');
   }
 
+  function getJsonFromScript(id) {
+    const el = document.getElementById(id);
+    if (!el) return null;
+    try {
+      return JSON.parse(el.textContent);
+    } catch (err) {
+      console.warn('Failed to parse report data:', err);
+      return null;
+    }
+  }
+
+  function csvEscape(value) {
+    if (value === null || value === undefined) return '';
+    const str = String(value);
+    if (/[",\n]/.test(str)) return `"${str.replace(/"/g, '""')}"`;
+    return str;
+  }
+
+  function buildCsv(report, faces) {
+    const lines = [];
+    lines.push('Summary');
+    lines.push('Metric,Value');
+    lines.push(`Total Faces,${csvEscape(report.total_faces ?? 0)}`);
+    if (report.average_age !== null && report.average_age !== undefined) {
+      lines.push(`Average Age,${csvEscape(report.average_age)}`);
+    }
+    if (report.age_range && report.age_range.length === 2) {
+      lines.push(`Age Range,${csvEscape(report.age_range[0])}-${csvEscape(report.age_range[1])}`);
+    }
+    if (report.gender_distribution) {
+      Object.entries(report.gender_distribution).forEach(([gender, count]) => {
+        lines.push(`Gender ${csvEscape(gender)},${csvEscape(count)}`);
+      });
+    }
+    if (report.emotion_distribution) {
+      Object.entries(report.emotion_distribution).forEach(([emotion, count]) => {
+        lines.push(`Emotion ${csvEscape(emotion)},${csvEscape(count)}`);
+      });
+    }
+    if (report.detection_methods) {
+      Object.entries(report.detection_methods).forEach(([method, count]) => {
+        lines.push(`Method ${csvEscape(method)},${csvEscape(count)}`);
+      });
+    }
+
+    lines.push('');
+    lines.push('Faces');
+    lines.push('id,method,confidence,bbox_x1,bbox_y1,bbox_x2,bbox_y2,age,gender,emotion,race');
+    (faces || []).forEach(face => {
+      const bbox = Array.isArray(face.bbox) ? face.bbox : [];
+      const row = [
+        face.id,
+        face.method,
+        face.confidence,
+        bbox[0],
+        bbox[1],
+        bbox[2],
+        bbox[3],
+        face.age,
+        face.gender,
+        face.emotion,
+        face.race
+      ].map(csvEscape).join(',');
+      lines.push(row);
+    });
+
+    return lines.join('\n');
+  }
+
+  function exportReport(format) {
+    const report = getJsonFromScript('analysis-report-json');
+    const faces = getJsonFromScript('face-details-json') || (report ? report.faces : null) || [];
+
+    if (!report) {
+      alert('No report data available. Run an analysis first.');
+      return;
+    }
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    let blob;
+    let filename;
+
+    if (format === 'json') {
+      const payload = Object.assign({ generated_at: new Date().toISOString() }, report);
+      blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      filename = `face_report_${timestamp}.json`;
+    } else if (format === 'csv') {
+      const csv = buildCsv(report, faces);
+      blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+      filename = `face_report_${timestamp}.csv`;
+    } else {
+      alert('Unknown export format.');
+      return;
+    }
+
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    URL.revokeObjectURL(link.href);
+    link.remove();
+  }
+
   // ── Single image: file preview ──────────────────────────────────────────────
   document.getElementById('fileInput').addEventListener('change', function(e) {
     const file = e.target.files[0];
