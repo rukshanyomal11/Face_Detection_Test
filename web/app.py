@@ -1,6 +1,7 @@
 import os
 import sys
 import uuid
+import time
 import cv2
 import json
 import base64
@@ -34,6 +35,105 @@ app = FastAPI()
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
+def _env_int(name, default):
+    try:
+        value = int(os.getenv(name, default))
+    except (TypeError, ValueError):
+        value = int(default)
+    return max(value, 0)
+
+OUTPUT_MAX_AGE_HOURS = _env_int("OUTPUT_MAX_AGE_HOURS", 168)  # 7 days
+OUTPUT_MAX_FILES = _env_int("OUTPUT_MAX_FILES", 300)
+OUTPUT_MAX_MB = _env_int("OUTPUT_MAX_MB", 500)
+
+def _scan_output_files():
+    files = []
+    try:
+        for entry in os.scandir(OUTPUT_DIR):
+            if not entry.is_file():
+                continue
+            try:
+                stat = entry.stat()
+            except FileNotFoundError:
+                continue
+            files.append({
+                "path": entry.path,
+                "mtime": stat.st_mtime,
+                "size": stat.st_size
+            })
+    except FileNotFoundError:
+        return []
+    return files
+
+def cleanup_output_dir():
+    now = time.time()
+    files = _scan_output_files()
+    deleted_files = 0
+    freed_bytes = 0
+
+    if OUTPUT_MAX_AGE_HOURS > 0:
+        cutoff = now - (OUTPUT_MAX_AGE_HOURS * 3600)
+        remaining = []
+        for info in files:
+            if info["mtime"] < cutoff:
+                try:
+                    os.remove(info["path"])
+                    deleted_files += 1
+                    freed_bytes += info["size"]
+                except OSError:
+                    remaining.append(info)
+            else:
+                remaining.append(info)
+        files = remaining
+
+    if OUTPUT_MAX_FILES > 0 and len(files) > OUTPUT_MAX_FILES:
+        files.sort(key=lambda x: x["mtime"], reverse=True)
+        to_delete = files[OUTPUT_MAX_FILES:]
+        files = files[:OUTPUT_MAX_FILES]
+        for info in to_delete:
+            try:
+                os.remove(info["path"])
+                deleted_files += 1
+                freed_bytes += info["size"]
+            except OSError:
+                continue
+
+    if OUTPUT_MAX_MB > 0:
+        max_bytes = OUTPUT_MAX_MB * 1024 * 1024
+        total_bytes = sum(info["size"] for info in files)
+        if total_bytes > max_bytes:
+            files.sort(key=lambda x: x["mtime"])
+            for info in files:
+                if total_bytes <= max_bytes:
+                    break
+                try:
+                    os.remove(info["path"])
+                    deleted_files += 1
+                    freed_bytes += info["size"]
+                    total_bytes -= info["size"]
+                except OSError:
+                    continue
+
+    stats = get_output_stats()
+    stats["deleted_files"] = deleted_files
+    stats["freed_mb"] = round(freed_bytes / (1024 * 1024), 2)
+    return stats
+
+def get_output_stats():
+    files = _scan_output_files()
+    total_bytes = sum(info["size"] for info in files)
+    return {
+        "total_files": len(files),
+        "total_mb": round(total_bytes / (1024 * 1024), 2),
+        "max_age_hours": OUTPUT_MAX_AGE_HOURS,
+        "max_files": OUTPUT_MAX_FILES,
+        "max_mb": OUTPUT_MAX_MB
+    }
+
+@app.on_event("startup")
+def _startup_cleanup():
+    cleanup_output_dir()
+
 def _json_default(obj):
     if isinstance(obj, (np.integer, np.floating)):
         return obj.item()
@@ -50,7 +150,8 @@ def home(request: Request):
         "face_count": None,
         "error": None,
         "analysis_report_json": None,
-        "face_details_json": None
+        "face_details_json": None,
+        "output_stats": get_output_stats()
     })
 
 
@@ -69,7 +170,8 @@ async def upload_image(
                 "face_count": None,
                 "error": "Please upload a JPG or PNG image.",
                 "analysis_report_json": None,
-                "face_details_json": None
+                "face_details_json": None,
+                "output_stats": get_output_stats()
             })
 
         content = await file.read()
@@ -83,7 +185,8 @@ async def upload_image(
                 "face_count": None,
                 "error": "Could not read the image.",
                 "analysis_report_json": None,
-                "face_details_json": None
+                "face_details_json": None,
+                "output_stats": get_output_stats()
             })
 
         # Enhanced detection with configurable analysis mode
@@ -100,6 +203,7 @@ async def upload_image(
         cv2.imwrite(out_path, out_img, [cv2.IMWRITE_JPEG_QUALITY, 95])
 
         output_url = f"/static/outputs/{out_name}"
+        cleanup_output_dir()
         
         # Generate analysis report
         analysis_report = generate_face_analysis_report(face_details)
@@ -130,7 +234,8 @@ async def upload_image(
             "analysis_report": analysis_report,
             "analysis_report_json": analysis_report_json,
             "face_details_json": face_details_json,
-            "error": None
+            "error": None,
+            "output_stats": get_output_stats()
         })
 
     except Exception as e:
@@ -143,7 +248,8 @@ async def upload_image(
             "face_count": None,
             "error": error_msg,
             "analysis_report_json": None,
-            "face_details_json": None
+            "face_details_json": None,
+            "output_stats": get_output_stats()
         })
 
 
@@ -179,6 +285,7 @@ async def batch_upload_images(
         
         # Process batch
         results = process_batch_images(temp_paths, min_confidence, analysis_mode, OUTPUT_DIR)
+        cleanup_output_dir()
         
         # Clean up temp files
         for temp_path in temp_paths:
@@ -190,7 +297,8 @@ async def batch_upload_images(
         return JSONResponse(content={
             "success": True,
             "total_processed": len(results),
-            "results": results
+            "results": results,
+            "output_stats": get_output_stats()
         })
         
     except Exception as e:
@@ -298,6 +406,7 @@ async def detect_api(
         out_name = f"{uuid.uuid4().hex}.jpg"
         out_path = os.path.join(OUTPUT_DIR, out_name)
         cv2.imwrite(out_path, out_img, [cv2.IMWRITE_JPEG_QUALITY, 95])
+        cleanup_output_dir()
 
         response_data = {
             "success": True,
@@ -388,6 +497,7 @@ async def api_detect_faces(
         out_name = f"api_{uuid.uuid4().hex}.jpg"
         out_path = os.path.join(OUTPUT_DIR, out_name)
         cv2.imwrite(out_path, out_img, [cv2.IMWRITE_JPEG_QUALITY, 95])
+        cleanup_output_dir()
         
         result = {
             "success": True,

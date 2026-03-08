@@ -49,6 +49,82 @@
       </div>
     </div>
 
+    <div class="analysis-advanced">
+      <h3>Advanced Analytics</h3>
+      <div class="analytics-grid">
+        <div class="chart-card">
+          <h4>Detection Methods</h4>
+          {% if analysis_report.method_breakdown %}
+            <div class="bar-list">
+              {% for item in analysis_report.method_breakdown %}
+              <div class="bar-row">
+                <div class="bar-label">{{ item.label }} ({{ item.count }})</div>
+                <div class="bar-track">
+                  <div class="bar-fill" style="width: {{ item.percent }}%;"></div>
+                </div>
+                <div class="bar-value">{{ item.percent }}%</div>
+              </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="stat-label">No method data available.</div>
+          {% endif %}
+        </div>
+
+        <div class="chart-card">
+          <h4>Confidence Distribution</h4>
+          {% if analysis_report.confidence_stats %}
+          <div class="chip-row">
+            <span class="chip">Avg {{ "%.2f"|format(analysis_report.confidence_stats.avg) }}</span>
+            <span class="chip">Min {{ "%.2f"|format(analysis_report.confidence_stats.min) }}</span>
+            <span class="chip">Max {{ "%.2f"|format(analysis_report.confidence_stats.max) }}</span>
+          </div>
+          {% endif %}
+          {% if analysis_report.confidence_histogram %}
+            <div class="bar-list">
+              {% for item in analysis_report.confidence_histogram %}
+              <div class="bar-row">
+                <div class="bar-label">{{ item.label }}</div>
+                <div class="bar-track">
+                  <div class="bar-fill" style="width: {{ item.percent }}%;"></div>
+                </div>
+                <div class="bar-value">{{ item.count }}</div>
+              </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="stat-label">No confidence data available.</div>
+          {% endif %}
+        </div>
+
+        <div class="chart-card">
+          <h4>Face Size (Relative)</h4>
+          {% if analysis_report.face_size_stats %}
+          <div class="chip-row">
+            <span class="chip">Avg {{ analysis_report.face_size_stats.avg_area }} px^2</span>
+            <span class="chip">Min {{ analysis_report.face_size_stats.min_area }} px^2</span>
+            <span class="chip">Max {{ analysis_report.face_size_stats.max_area }} px^2</span>
+          </div>
+          {% endif %}
+          {% if analysis_report.face_size_histogram %}
+            <div class="bar-list">
+              {% for item in analysis_report.face_size_histogram %}
+              <div class="bar-row">
+                <div class="bar-label">{{ item.label }}</div>
+                <div class="bar-track">
+                  <div class="bar-fill" style="width: {{ item.percent }}%;"></div>
+                </div>
+                <div class="bar-value">{{ item.count }}</div>
+              </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="stat-label">No size data available.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
     <div class="export-actions">
       <button type="button" class="btn btn-secondary" onclick="exportReport('json')">Export JSON</button>
       <button type="button" class="btn btn-secondary" onclick="exportReport('csv')">Export CSV</button>
@@ -59,6 +135,33 @@
     {% if face_details_json %}
     <script id="face-details-json" type="application/json">{{ face_details_json | safe }}</script>
     {% endif %}
+  {% endif %}
+
+  {% if output_stats %}
+    <div class="storage-summary">
+      <h3>Output Storage</h3>
+      <div class="stat-grid">
+        <div class="stat-item">
+          <div class="stat-number">{{ output_stats.total_files }}</div>
+          <div class="stat-label">Stored Files</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-number">{{ output_stats.total_mb }}</div>
+          <div class="stat-label">Total Size (MB)</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-number">{{ output_stats.max_files }}</div>
+          <div class="stat-label">File Limit</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-number">{{ output_stats.max_mb }}</div>
+          <div class="stat-label">Size Limit (MB)</div>
+        </div>
+      </div>
+      <div class="storage-note">
+        Cleanup policy: keep files up to {{ output_stats.max_age_hours }} hours old.
+      </div>
+    </div>
   {% endif %}
 
   {% if face_details %}

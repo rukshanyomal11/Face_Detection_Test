@@ -612,6 +612,24 @@ def generate_face_analysis_report(face_details):
     """
     if not face_details:
         return {}
+
+    def _build_histogram(values, bins, labels=None):
+        total = len(values)
+        histogram = []
+        for idx, (start, end) in enumerate(bins):
+            if idx == len(bins) - 1:
+                count = sum(1 for v in values if v >= start and v <= end)
+            else:
+                count = sum(1 for v in values if v >= start and v < end)
+            percent = round((count / total) * 100, 1) if total else 0.0
+            label = labels[idx] if labels and idx < len(labels) else f"{start:.1f}-{end:.1f}"
+            histogram.append({
+                'label': label,
+                'range': [start, end],
+                'count': count,
+                'percent': percent
+            })
+        return histogram
     
     # Statistics
     total_faces = len(face_details)
@@ -631,6 +649,67 @@ def generate_face_analysis_report(face_details):
     # Detection method statistics
     methods = [face.get('method') for face in face_details]
     method_counts = {method: methods.count(method) for method in set(methods)}
+
+    # Confidence statistics
+    confidences = [face.get('confidence') for face in face_details if face.get('confidence') is not None]
+    confidence_stats = None
+    confidence_histogram = []
+    if confidences:
+        conf_min = min(confidences)
+        conf_max = max(confidences)
+        conf_avg = sum(confidences) / len(confidences)
+        confidence_stats = {
+            'min': round(conf_min, 3),
+            'max': round(conf_max, 3),
+            'avg': round(conf_avg, 3)
+        }
+        conf_bins = [(0.0, 0.2), (0.2, 0.4), (0.4, 0.6), (0.6, 0.8), (0.8, 1.0)]
+        confidence_histogram = _build_histogram(confidences, conf_bins)
+
+    # Face size statistics (relative to the largest detected face)
+    areas = []
+    for face in face_details:
+        bbox = face.get('bbox')
+        if isinstance(bbox, (list, tuple)) and len(bbox) == 4:
+            x1, y1, x2, y2 = bbox
+            width = max(0, x2 - x1)
+            height = max(0, y2 - y1)
+            area = width * height
+            if area > 0:
+                areas.append(area)
+
+    face_size_stats = None
+    face_size_histogram = []
+    if areas:
+        min_area = min(areas)
+        max_area = max(areas)
+        avg_area = sum(areas) / len(areas)
+        face_size_stats = {
+            'min_area': round(min_area, 1),
+            'max_area': round(max_area, 1),
+            'avg_area': round(avg_area, 1)
+        }
+        max_area_safe = max_area if max_area > 0 else 1
+        ratios = [area / max_area_safe for area in areas]
+        size_bins = [(0.0, 0.2), (0.2, 0.4), (0.4, 0.6), (0.6, 0.8), (0.8, 1.0)]
+        size_labels = [
+            "Tiny (0.0-0.2)",
+            "Small (0.2-0.4)",
+            "Medium (0.4-0.6)",
+            "Large (0.6-0.8)",
+            "XL (0.8-1.0)"
+        ]
+        face_size_histogram = _build_histogram(ratios, size_bins, size_labels)
+
+    # Method breakdown with percentages
+    method_breakdown = []
+    for method, count in sorted(method_counts.items(), key=lambda x: x[1], reverse=True):
+        percent = round((count / total_faces) * 100, 1) if total_faces else 0.0
+        method_breakdown.append({
+            'label': method,
+            'count': count,
+            'percent': percent
+        })
     
     return {
         'total_faces': total_faces,
@@ -639,5 +718,10 @@ def generate_face_analysis_report(face_details):
         'gender_distribution': gender_counts,
         'emotion_distribution': emotion_counts,
         'detection_methods': method_counts,
+        'method_breakdown': method_breakdown,
+        'confidence_stats': confidence_stats,
+        'confidence_histogram': confidence_histogram,
+        'face_size_stats': face_size_stats,
+        'face_size_histogram': face_size_histogram,
         'faces': face_details
     }

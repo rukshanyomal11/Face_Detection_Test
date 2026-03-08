@@ -339,6 +339,85 @@
 
     .analysis-summary h3 { margin-top: 0; }
 
+    .analysis-advanced {
+      background: var(--surface-2);
+      border-radius: 16px;
+      padding: 18px;
+      border: 1px solid var(--border);
+      margin-top: 16px;
+    }
+
+    .analysis-advanced h3 { margin-top: 0; }
+
+    .analytics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 14px;
+      margin-top: 12px;
+    }
+
+    .chart-card {
+      background: white;
+      border-radius: 14px;
+      padding: 14px;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .chart-card h4 {
+      margin: 0 0 10px;
+      font-size: 1rem;
+    }
+
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .chip {
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--ink);
+      background: rgba(15, 118, 110, 0.12);
+      border: 1px solid rgba(15, 118, 110, 0.25);
+    }
+
+    .bar-list { display: grid; gap: 8px; }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: 1fr 2fr auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .bar-label {
+      font-size: 0.84rem;
+      color: var(--muted);
+    }
+
+    .bar-track {
+      height: 8px;
+      background: #e2e8f0;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      background: linear-gradient(135deg, #0f766e 0%, #2563eb 100%);
+    }
+
+    .bar-value {
+      font-size: 0.84rem;
+      font-weight: 600;
+      color: var(--ink);
+    }
+
     .stat-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -362,6 +441,22 @@
     }
 
     .stat-label { font-size: 0.9rem; color: var(--muted); }
+
+    .storage-summary {
+      background: var(--surface-2);
+      border-radius: 16px;
+      padding: 18px;
+      border: 1px solid var(--border);
+      margin-top: 16px;
+    }
+
+    .storage-summary h3 { margin-top: 0; }
+
+    .storage-note {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
 
     .face-analysis {
       display: grid;

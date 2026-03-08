@@ -50,6 +50,38 @@
         lines.push(`Method ${csvEscape(method)},${csvEscape(count)}`);
       });
     }
+    if (report.confidence_stats) {
+      if (report.confidence_stats.avg !== null && report.confidence_stats.avg !== undefined) {
+        lines.push(`Confidence Avg,${csvEscape(report.confidence_stats.avg)}`);
+      }
+      if (report.confidence_stats.min !== null && report.confidence_stats.min !== undefined) {
+        lines.push(`Confidence Min,${csvEscape(report.confidence_stats.min)}`);
+      }
+      if (report.confidence_stats.max !== null && report.confidence_stats.max !== undefined) {
+        lines.push(`Confidence Max,${csvEscape(report.confidence_stats.max)}`);
+      }
+    }
+    if (report.confidence_histogram) {
+      report.confidence_histogram.forEach(bucket => {
+        lines.push(`Confidence ${csvEscape(bucket.label)},${csvEscape(bucket.count)}`);
+      });
+    }
+    if (report.face_size_stats) {
+      if (report.face_size_stats.avg_area !== null && report.face_size_stats.avg_area !== undefined) {
+        lines.push(`Face Size Avg (px^2),${csvEscape(report.face_size_stats.avg_area)}`);
+      }
+      if (report.face_size_stats.min_area !== null && report.face_size_stats.min_area !== undefined) {
+        lines.push(`Face Size Min (px^2),${csvEscape(report.face_size_stats.min_area)}`);
+      }
+      if (report.face_size_stats.max_area !== null && report.face_size_stats.max_area !== undefined) {
+        lines.push(`Face Size Max (px^2),${csvEscape(report.face_size_stats.max_area)}`);
+      }
+    }
+    if (report.face_size_histogram) {
+      report.face_size_histogram.forEach(bucket => {
+        lines.push(`Face Size ${csvEscape(bucket.label)},${csvEscape(bucket.count)}`);
+      });
+    }
 
     lines.push('');
     lines.push('Faces');
