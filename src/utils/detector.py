@@ -37,11 +37,19 @@ if _HAS_MEDIAPIPE:
     mp_drawing = mp.solutions.drawing_utils
     mp_face_mesh = mp.solutions.face_mesh
     mp_drawing_styles = mp.solutions.drawing_styles
+    try:
+        _MP_FACE_DETECTOR = mp_face.FaceDetection(
+            model_selection=0,
+            min_detection_confidence=0.1
+        )
+    except Exception:
+        _MP_FACE_DETECTOR = None
 else:
     mp_face = None
     mp_drawing = None
     mp_face_mesh = None
     mp_drawing_styles = None
+    _MP_FACE_DETECTOR = None
 
 # Initialize MTCNN
 _HAS_MTCNN = bool(MTCNN)
@@ -65,6 +73,33 @@ _HAAR_PATH = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
 _HAAR = cv2.CascadeClassifier(_HAAR_PATH)
 if _HAAR.empty():
     raise RuntimeError(f"Could not load Haar cascade from {_HAAR_PATH}")
+
+
+def _to_python_number(value):
+    """
+    Convert NumPy scalar values into plain Python numbers for JSON responses.
+    """
+    if isinstance(value, np.integer):
+        return int(value)
+    if isinstance(value, np.floating):
+        return float(value)
+    return value
+
+
+def _normalize_bbox(bbox):
+    return tuple(int(_to_python_number(coord)) for coord in bbox)
+
+
+def _normalize_face_info(face_info):
+    normalized = {}
+    for key, value in face_info.items():
+        if key == 'bbox' and isinstance(value, (list, tuple)):
+            normalized[key] = [int(_to_python_number(coord)) for coord in value]
+        elif isinstance(value, np.ndarray):
+            normalized[key] = value.tolist()
+        else:
+            normalized[key] = _to_python_number(value)
+    return normalized
 
 def preprocess_image(bgr_image):
     """
@@ -96,6 +131,21 @@ def preprocess_image(bgr_image):
     return enhanced
 
 
+def resize_for_realtime(bgr_image, max_dimension=480):
+    """
+    Downscale webcam frames to keep realtime detection responsive.
+    """
+    height, width = bgr_image.shape[:2]
+    largest_dimension = max(width, height)
+    if largest_dimension <= max_dimension:
+        return bgr_image.copy()
+
+    scale = max_dimension / float(largest_dimension)
+    new_width = max(1, int(width * scale))
+    new_height = max(1, int(height * scale))
+    return cv2.resize(bgr_image, (new_width, new_height), interpolation=cv2.INTER_AREA)
+
+
 def detect_faces_mediapipe(bgr_image, min_conf=0.5):
     """
     Detect faces using MediaPipe
@@ -107,8 +157,10 @@ def detect_faces_mediapipe(bgr_image, min_conf=0.5):
     h, w, _ = bgr_image.shape
     rgb = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2RGB)
     
-    with mp_face.FaceDetection(model_selection=0, min_detection_confidence=min_conf) as face_detection:
-        results = face_detection.process(rgb)
+    if _MP_FACE_DETECTOR is None:
+        return faces
+
+    results = _MP_FACE_DETECTOR.process(rgb)
     
     if results.detections:
         for det in results.detections:
@@ -122,9 +174,11 @@ def detect_faces_mediapipe(bgr_image, min_conf=0.5):
             y2 = min(h - 1, y + bh)
             
             confidence = det.score[0]
+            if confidence < min_conf:
+                continue
             faces.append({
-                'bbox': (x, y, x2, y2),
-                'confidence': confidence,
+                'bbox': _normalize_bbox((x, y, x2, y2)),
+                'confidence': float(_to_python_number(confidence)),
                 'method': 'MediaPipe'
             })
     
@@ -152,8 +206,8 @@ def detect_faces_mtcnn(bgr_image, min_conf=0.5):
                 y2 = min(bgr_image.shape[0] - 1, y + height)
                 
                 faces.append({
-                    'bbox': (x, y, x2, y2),
-                    'confidence': det['confidence'],
+                    'bbox': _normalize_bbox((x, y, x2, y2)),
+                    'confidence': float(_to_python_number(det['confidence'])),
                     'method': 'MTCNN'
                 })
     except Exception as e:
@@ -176,7 +230,7 @@ def detect_faces_face_recognition(bgr_image):
         
         for (top, right, bottom, left) in face_locations:
             faces.append({
-                'bbox': (left, top, right, bottom),
+                'bbox': _normalize_bbox((left, top, right, bottom)),
                 'confidence': 0.8,  # face_recognition doesn't provide confidence scores
                 'method': 'face_recognition'
             })
@@ -186,7 +240,13 @@ def detect_faces_face_recognition(bgr_image):
     return faces
 
 
-def detect_faces_haar(bgr_image, min_conf=0.3):
+def detect_faces_haar(
+    bgr_image,
+    min_conf=0.3,
+    scale_factor=1.05,
+    min_neighbors=5,
+    min_size=(30, 30)
+):
     """
     Detect faces using Haar Cascades (fallback method)
     """
@@ -195,15 +255,15 @@ def detect_faces_haar(bgr_image, min_conf=0.3):
         gray = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2GRAY)
         face_rects = _HAAR.detectMultiScale(
             gray, 
-            scaleFactor=1.05, 
-            minNeighbors=5, 
-            minSize=(30, 30),
+            scaleFactor=scale_factor, 
+            minNeighbors=min_neighbors, 
+            minSize=min_size,
             flags=cv2.CASCADE_SCALE_IMAGE
         )
         
         for (x, y, w, h) in face_rects:
             faces.append({
-                'bbox': (x, y, x + w, y + h),
+                'bbox': _normalize_bbox((x, y, x + w, y + h)),
                 'confidence': 0.7,  # Haar doesn't provide confidence, use fixed value
                 'method': 'Haar'
             })
@@ -431,6 +491,65 @@ def extract_face_crops(bgr_image, faces):
     return face_crops
 
 
+def detect_and_draw_faces_realtime(bgr_image, min_conf=0.5):
+    """
+    Lightweight webcam pipeline that favors responsiveness over exhaustive analysis.
+    """
+    realtime_image = resize_for_realtime(bgr_image)
+    if _HAS_MEDIAPIPE and _MP_FACE_DETECTOR is not None:
+        final_faces = detect_faces_mediapipe(realtime_image, min_conf)
+        detector_name = 'MediaPipe'
+        if not final_faces:
+            final_faces = detect_faces_haar(
+                realtime_image,
+                min_conf=min_conf * 0.7,
+                scale_factor=1.1,
+                min_neighbors=6,
+                min_size=(40, 40)
+            )
+            if final_faces:
+                detector_name = 'Haar'
+    else:
+        final_faces = detect_faces_haar(
+            realtime_image,
+            min_conf=min_conf * 0.7,
+            scale_factor=1.1,
+            min_neighbors=6,
+            min_size=(40, 40)
+        )
+        detector_name = 'Haar'
+
+    output_image = realtime_image.copy()
+    face_details = []
+
+    for i, face in enumerate(final_faces):
+        x1, y1, x2, y2 = face['bbox']
+        confidence = face['confidence']
+        method = face['method']
+        color = (0, 220, 110) if method == 'MediaPipe' else (255, 210, 0)
+
+        cv2.rectangle(output_image, (x1, y1), (x2, y2), color, 2)
+        cv2.putText(
+            output_image,
+            f"Face {i + 1} ({confidence:.2f})",
+            (x1, max(22, y1 - 10)),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.55,
+            color,
+            2
+        )
+
+        face_details.append({
+            'id': i + 1,
+            'bbox': [x1, y1, x2, y2],
+            'confidence': confidence,
+            'method': method
+        })
+
+    face_details = [_normalize_face_info(face) for face in face_details]
+    return output_image, len(face_details), face_details, detector_name
+
+
 def detect_and_draw_faces(bgr_image, min_conf=0.5, analysis_mode='basic'):
     """
     Enhanced face detection with multiple analysis modes:
@@ -543,7 +662,7 @@ def detect_and_draw_faces(bgr_image, min_conf=0.5, analysis_mode='basic'):
                 1
             )
         
-        face_details.append(face_info)
+        face_details.append(_normalize_face_info(face_info))
     
     # Use landmarks image if available
     if landmarks_image is not None:

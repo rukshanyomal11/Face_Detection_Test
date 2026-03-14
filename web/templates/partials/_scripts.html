@@ -268,17 +268,137 @@
   });
 
   // ── Webcam live detection ─────────────────────────────────────────────────────
-  let _webcamStream   = null;
-  let _webcamInterval = null;
-  let _webcamBusy     = false;
+  let _webcamStream = null;
+  let _webcamLoop = null;
+  let _webcamBusy = false;
+
+  function getWebcamMode() {
+    const select = document.getElementById('webcamMode');
+    return select && select.value === 'accurate' ? 'accurate' : 'fast';
+  }
+
+  function getWebcamModeConfig() {
+    if (getWebcamMode() === 'accurate') {
+      return {
+        mode: 'accurate',
+        label: 'Accurate',
+        maxFrameWidth: 640,
+        jpegQuality: 0.82,
+        startupDelayMs: 220,
+        retryDelayMs: 320,
+        nextDelayMs: 420
+      };
+    }
+
+    return {
+      mode: 'fast',
+      label: 'Fast',
+      maxFrameWidth: 480,
+      jpegQuality: 0.72,
+      startupDelayMs: 150,
+      retryDelayMs: 220,
+      nextDelayMs: 180
+    };
+  }
+
+  function updateWebcamModeHelp() {
+    const help = document.getElementById('webcamModeHelp');
+    if (!help) return;
+
+    if (getWebcamMode() === 'accurate') {
+      help.textContent = 'Accurate mode uses the heavier detector pipeline. It is slower, but better for harder faces.';
+      return;
+    }
+
+    help.textContent = 'Fast mode updates more smoothly. Accurate mode is slower but can detect harder faces better.';
+  }
+
+  function scheduleNextWebcamCapture(delayMs = 180) {
+    if (!_webcamStream) return;
+    clearTimeout(_webcamLoop);
+    _webcamLoop = setTimeout(captureAndDetect, delayMs);
+  }
+
+  async function renderWebcamPreview(blob, faces) {
+    const preview = document.getElementById('webcamPreview');
+    const placeholder = document.getElementById('webcamPlaceholder');
+    if (!preview || !placeholder || !blob) return;
+
+    const bitmap = await createImageBitmap(blob);
+    preview.width = bitmap.width;
+    preview.height = bitmap.height;
+
+    const ctx = preview.getContext('2d');
+    ctx.clearRect(0, 0, preview.width, preview.height);
+    ctx.drawImage(bitmap, 0, 0);
+    if (typeof bitmap.close === 'function') bitmap.close();
+
+    ctx.textBaseline = 'top';
+    ctx.font = '600 15px Arial';
+    ctx.lineWidth = 2;
+
+    (faces || []).forEach((face, index) => {
+      const bbox = Array.isArray(face.bbox) ? face.bbox : [];
+      if (bbox.length !== 4) return;
+
+      const [x1, y1, x2, y2] = bbox;
+      const width = x2 - x1;
+      const height = y2 - y1;
+      if (width <= 0 || height <= 0) return;
+
+      const color = face.method === 'MediaPipe' ? '#10b981' : '#f59e0b';
+      const confidence = Number(face.confidence || 0).toFixed(2);
+      const label = `Face ${index + 1} ${confidence}`;
+
+      ctx.strokeStyle = color;
+      ctx.strokeRect(x1, y1, width, height);
+
+      const textWidth = ctx.measureText(label).width;
+      const labelY = Math.max(0, y1 - 24);
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+      ctx.fillRect(x1, labelY, textWidth + 12, 22);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(label, x1 + 6, labelY + 4);
+    });
+
+    preview.style.display = 'block';
+    placeholder.style.display = 'none';
+  }
+
+  const webcamModeSelect = document.getElementById('webcamMode');
+  if (webcamModeSelect) {
+    webcamModeSelect.addEventListener('change', function() {
+      updateWebcamModeHelp();
+      if (_webcamStream) {
+        const status = document.getElementById('webcamStatus');
+        const config = getWebcamModeConfig();
+        status.style.display = 'block';
+        status.textContent = `Switched to ${config.label.toLowerCase()} mode. Applying on the next frame...`;
+      }
+    });
+    updateWebcamModeHelp();
+  }
 
   async function startWebcam() {
     try {
-      _webcamStream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+      stopWebcam();
+      const webcamConfig = getWebcamModeConfig();
+      _webcamStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          facingMode: 'user'
+        },
+        audio: false
+      });
       const video = document.getElementById('webcamVideo');
       video.srcObject = _webcamStream;
+      video.play().catch(() => {});
       document.getElementById('stopWebcamBtn').disabled = false;
-      _webcamInterval = setInterval(captureAndDetect, 1200);
+      const status = document.getElementById('webcamStatus');
+      status.style.display = 'block';
+      status.textContent = `Starting ${webcamConfig.label.toLowerCase()} webcam detection...`;
+      scheduleNextWebcamCapture(webcamConfig.startupDelayMs);
     } catch (err) {
       alert('Camera access denied or unavailable: ' + err.message);
     }
@@ -289,47 +409,75 @@
       _webcamStream.getTracks().forEach(t => t.stop());
       _webcamStream = null;
     }
-    clearInterval(_webcamInterval);
-    _webcamInterval = null;
+    clearTimeout(_webcamLoop);
+    _webcamLoop = null;
     _webcamBusy = false;
     document.getElementById('webcamVideo').srcObject = null;
     document.getElementById('stopWebcamBtn').disabled = true;
     document.getElementById('webcamStatus').style.display = 'none';
-    document.getElementById('webcamResult').innerHTML = '<span>Detection output will appear here</span>';
+    const preview = document.getElementById('webcamPreview');
+    const placeholder = document.getElementById('webcamPlaceholder');
+    preview.style.display = 'none';
+    preview.width = 0;
+    preview.height = 0;
+    placeholder.style.display = 'block';
   }
 
   async function captureAndDetect() {
     if (_webcamBusy || !_webcamStream) return;
     const video = document.getElementById('webcamVideo');
-    if (video.videoWidth === 0) return;
+    const webcamConfig = getWebcamModeConfig();
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      scheduleNextWebcamCapture(webcamConfig.startupDelayMs);
+      return;
+    }
     _webcamBusy = true;
 
     const canvas = document.getElementById('webcamCanvas');
-    canvas.width  = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext('2d').drawImage(video, 0, 0);
+    const scale = Math.min(1, webcamConfig.maxFrameWidth / video.videoWidth);
+    canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+    canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
 
     canvas.toBlob(async (blob) => {
+      if (!blob) {
+        _webcamBusy = false;
+        scheduleNextWebcamCapture(webcamConfig.retryDelayMs);
+        return;
+      }
+
+      const requestStartedAt = performance.now();
       try {
         const fd = new FormData();
         fd.append('file', blob, 'frame.jpg');
         fd.append('min_confidence', document.getElementById('webcamConfidence').value);
+        fd.append('webcam_mode', webcamConfig.mode);
+        fd.append('return_frame', 'false');
 
         const res  = await fetch('/api/webcam-detect', { method: 'POST', body: fd });
         const data = await res.json();
-
-        if (data.success) {
-          document.getElementById('webcamResult').innerHTML =
-            `<img src="${data.frame}" style="width:100%; border-radius:14px; display:block;">`;
-          const status = document.getElementById('webcamStatus');
-          status.style.display = 'block';
-          status.textContent = `Detected ${data.face_count} face(s)`;
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || 'Realtime detection failed');
         }
+
+        await renderWebcamPreview(blob, data.faces || []);
+
+        const status = document.getElementById('webcamStatus');
+        const processingMs = Math.round(Number(data.processing_ms || 0));
+        const roundtripMs = Math.round(performance.now() - requestStartedAt);
+        const modeLabel = data.mode === 'accurate' ? 'accurate' : 'fast';
+        status.style.display = 'block';
+        status.textContent =
+          `Detected ${data.face_count} face(s) in ${modeLabel} mode using ${data.detector} in ${processingMs} ms server / ${roundtripMs} ms total`;
       } catch (e) {
         console.error('Webcam detection error:', e);
+        const status = document.getElementById('webcamStatus');
+        status.style.display = 'block';
+        status.textContent = `Realtime detection error: ${e.message}`;
       } finally {
         _webcamBusy = false;
+        scheduleNextWebcamCapture(getWebcamModeConfig().nextDelayMs);
       }
-    }, 'image/jpeg', 0.85);
+    }, 'image/jpeg', webcamConfig.jpegQuality);
   }
 </script>

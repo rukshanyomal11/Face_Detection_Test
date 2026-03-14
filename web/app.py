@@ -16,6 +16,7 @@ from fastapi.staticfiles import StaticFiles
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.utils.detector import (
     detect_and_draw_faces, 
+    detect_and_draw_faces_realtime,
     process_batch_images, 
     compare_faces,
     extract_face_crops,
@@ -140,6 +141,10 @@ def _json_default(obj):
     if isinstance(obj, np.ndarray):
         return obj.tolist()
     return str(obj)
+
+
+def _json_safe(payload):
+    return json.loads(json.dumps(payload, default=_json_default))
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -294,12 +299,12 @@ async def batch_upload_images(
             except:
                 pass
         
-        return JSONResponse(content={
+        return JSONResponse(content=_json_safe({
             "success": True,
             "total_processed": len(results),
             "results": results,
             "output_stats": get_output_stats()
-        })
+        }))
         
     except Exception as e:
         return JSONResponse(
@@ -422,7 +427,7 @@ async def detect_api(
                 [{"bbox": f["bbox"], "confidence": f["confidence"], "method": f["method"]} for f in face_details]
             )
 
-        return JSONResponse(content=response_data)
+        return JSONResponse(content=_json_safe(response_data))
 
     except HTTPException:
         raise
@@ -433,12 +438,15 @@ async def detect_api(
 @app.post("/api/webcam-detect", response_class=JSONResponse)
 async def webcam_detect(
     file: UploadFile = File(...),
-    min_confidence: float = Form(0.3)
+    min_confidence: float = Form(0.3),
+    webcam_mode: str = Form("fast"),
+    return_frame: bool = Form(True)
 ):
     """
     Process a single webcam frame and return the annotated image as base64
     """
     try:
+        start_time = time.perf_counter()
         content = await file.read()
         img_array = np.frombuffer(content, dtype=np.uint8)
         img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
@@ -446,22 +454,42 @@ async def webcam_detect(
         if img is None:
             return JSONResponse(content={"success": False, "error": "Could not decode frame"})
 
-        out_img, face_count, face_details = detect_and_draw_faces(
-            img, min_conf=min_confidence, analysis_mode="basic"
-        )
+        webcam_mode = (webcam_mode or "fast").strip().lower()
+        if webcam_mode == "accurate":
+            out_img, face_count, face_details = detect_and_draw_faces(
+                img,
+                min_conf=min_confidence,
+                analysis_mode="basic"
+            )
+            methods = sorted({face.get("method") for face in face_details if face.get("method")})
+            detector_name = ", ".join(methods) if methods else "Accurate Pipeline"
+        else:
+            webcam_mode = "fast"
+            out_img, face_count, face_details, detector_name = detect_and_draw_faces_realtime(
+                img, min_conf=min_confidence
+            )
 
-        _, buffer = cv2.imencode(".jpg", out_img, [cv2.IMWRITE_JPEG_QUALITY, 85])
-        frame_b64 = base64.b64encode(buffer).decode("utf-8")
-
-        return JSONResponse(content={
+        response_data = {
             "success": True,
             "face_count": face_count,
-            "frame": f"data:image/jpeg;base64,{frame_b64}",
+            "mode": webcam_mode,
             "faces": [
-                {"id": f["id"], "confidence": round(f["confidence"], 2), "method": f["method"]}
+                {"id": f["id"], "bbox": f["bbox"], "confidence": round(f["confidence"], 2), "method": f["method"]}
                 for f in face_details
-            ]
-        })
+            ],
+            "detector": detector_name,
+            "processing_ms": round((time.perf_counter() - start_time) * 1000, 1),
+            "frame_size": {
+                "width": int(out_img.shape[1]),
+                "height": int(out_img.shape[0])
+            }
+        }
+
+        if return_frame:
+            _, buffer = cv2.imencode(".jpg", out_img, [cv2.IMWRITE_JPEG_QUALITY, 80])
+            response_data["frame"] = f"data:image/jpeg;base64,{base64.b64encode(buffer).decode('utf-8')}"
+
+        return JSONResponse(content=_json_safe(response_data))
 
     except Exception as e:
         return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
@@ -515,7 +543,7 @@ async def api_detect_faces(
             ])
             result["face_crops"] = face_crops
         
-        return JSONResponse(content=result)
+        return JSONResponse(content=_json_safe(result))
         
     except HTTPException:
         raise
