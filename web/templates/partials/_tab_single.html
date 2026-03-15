@@ -3,7 +3,7 @@
     <form id="uploadForm" action="/upload" method="post" enctype="multipart/form-data">
       <div class="form-group">
         <input type="file" id="fileInput" name="file" accept=".jpg,.jpeg,.png" required class="file-input">
-        <label for="fileInput" class="file-label">&#128247; Choose Image</label>
+        <label for="fileInput" id="singleFileLabel" class="file-label">&#128247; Choose Image</label>
         <div id="imagePreview" style="display:none; margin-top:12px;">
           <p style="font-weight:600; margin:0 0 6px; font-size:0.87rem; color:var(--muted);">Preview</p>
           <img id="previewImage" alt="Selected image preview" style="max-width:100%; max-height:280px; border-radius:12px; border:1px solid var(--border); object-fit:contain; display:block;">

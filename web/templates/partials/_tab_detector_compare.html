@@ -1,0 +1,64 @@
+<div id="detector-compare-tab" class="tab-content">
+  <div class="panel upload-section">
+    <form id="detectorCompareForm" enctype="multipart/form-data">
+      <div class="compare-controls">
+        <div>
+          <div class="form-group">
+            <input type="file" id="detectorCompareFile" name="file" accept=".jpg,.jpeg,.png" required class="file-input">
+            <label for="detectorCompareFile" id="detectorCompareFileLabel" class="file-label">&#128269; Choose Image for Detector Comparison</label>
+            <div id="detectorComparePreviewWrap" style="display:none; margin-top:12px;">
+              <p style="font-weight:600; margin:0 0 6px; font-size:0.87rem; color:var(--muted);">Comparison Preview</p>
+              <img id="detectorComparePreview" alt="Selected image for detector comparison" style="max-width:100%; max-height:280px; border-radius:12px; border:1px solid var(--border); object-fit:contain; display:block;">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="detectorCompareConfidence">Detection Confidence: <span id="detectorCompareConfidenceValue">0.3</span></label>
+            <input type="range" id="detectorCompareConfidence" name="min_confidence" min="0.1" max="1.0" step="0.1" value="0.3" class="form-control">
+          </div>
+        </div>
+
+        <div>
+          <div class="form-group">
+            <label>Select Detectors</label>
+            <div class="detector-picker">
+              <label class="detector-option">
+                <input type="checkbox" name="detectors" value="mediapipe" checked>
+                <span>
+                  <strong>MediaPipe</strong>
+                  <small>Fast and balanced for general image detection.</small>
+                </span>
+              </label>
+              <label class="detector-option">
+                <input type="checkbox" name="detectors" value="mtcnn" checked>
+                <span>
+                  <strong>MTCNN</strong>
+                  <small>Usually stronger on small or harder faces.</small>
+                </span>
+              </label>
+              <label class="detector-option">
+                <input type="checkbox" name="detectors" value="face_recognition" checked>
+                <span>
+                  <strong>face_recognition</strong>
+                  <small>Classic HOG detector that can differ on profile shots.</small>
+                </span>
+              </label>
+              <label class="detector-option">
+                <input type="checkbox" name="detectors" value="haar" checked>
+                <span>
+                  <strong>Haar Cascade</strong>
+                  <small>Lightweight OpenCV fallback with wide compatibility.</small>
+                </span>
+              </label>
+            </div>
+            <small class="detector-help">Compare the same image across multiple pipelines to see which detector is finding more faces and with what confidence.</small>
+          </div>
+        </div>
+      </div>
+
+      <button type="button" onclick="compareDetectors()" class="btn btn-primary">Run Detector Comparison</button>
+    </form>
+
+    <div id="detectorCompareResults" class="result-section"></div>
+  </div>
+</div>

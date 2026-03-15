@@ -216,7 +216,7 @@ def detect_faces_mtcnn(bgr_image, min_conf=0.5):
     return faces
 
 
-def detect_faces_face_recognition(bgr_image):
+def detect_faces_face_recognition(bgr_image, min_conf=0.5):
     """
     Detect faces using face_recognition library
     """
@@ -228,10 +228,14 @@ def detect_faces_face_recognition(bgr_image):
         rgb = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2RGB)
         face_locations = face_recognition.face_locations(rgb, model='hog')
         
+        fixed_confidence = 0.8
+        if fixed_confidence < min_conf:
+            return faces
+
         for (top, right, bottom, left) in face_locations:
             faces.append({
                 'bbox': _normalize_bbox((left, top, right, bottom)),
-                'confidence': 0.8,  # face_recognition doesn't provide confidence scores
+                'confidence': fixed_confidence,  # face_recognition doesn't provide confidence scores
                 'method': 'face_recognition'
             })
     except Exception as e:
@@ -260,11 +264,15 @@ def detect_faces_haar(
             minSize=min_size,
             flags=cv2.CASCADE_SCALE_IMAGE
         )
-        
+
+        fixed_confidence = 0.7
+        if fixed_confidence < min_conf:
+            return faces
+
         for (x, y, w, h) in face_rects:
             faces.append({
                 'bbox': _normalize_bbox((x, y, x + w, y + h)),
-                'confidence': 0.7,  # Haar doesn't provide confidence, use fixed value
+                'confidence': fixed_confidence,  # Haar doesn't provide confidence, use fixed value
                 'method': 'Haar'
             })
     except Exception as e:
@@ -491,6 +499,245 @@ def extract_face_crops(bgr_image, faces):
     return face_crops
 
 
+def _get_method_color(method):
+    color_map = {
+        'MediaPipe': (0, 255, 0),
+        'MTCNN': (255, 0, 0),
+        'face_recognition': (0, 165, 255),
+        'Haar': (255, 255, 0)
+    }
+    return color_map.get(method, (0, 255, 0))
+
+
+def _draw_detected_faces(bgr_image, faces):
+    """
+    Draw normalized detector output onto an image and return serializable face details.
+    """
+    output_image = bgr_image.copy()
+    face_details = []
+
+    for face in faces:
+        bbox = face.get('bbox')
+        if not isinstance(bbox, (list, tuple)) or len(bbox) != 4:
+            continue
+
+        face_id = len(face_details) + 1
+        x1, y1, x2, y2 = _normalize_bbox(bbox)
+        confidence = float(_to_python_number(face.get('confidence', 0.0) or 0.0))
+        method = face.get('method', 'Unknown')
+        color = _get_method_color(method)
+
+        cv2.rectangle(output_image, (x1, y1), (x2, y2), color, 2)
+
+        label = f"Face {face_id} ({confidence:.2f})"
+        detail = method
+        label_y = max(25, y1 - 10)
+        cv2.putText(
+            output_image,
+            label,
+            (x1, label_y),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            color,
+            2
+        )
+        cv2.putText(
+            output_image,
+            detail,
+            (x1, label_y + 20),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.45,
+            color,
+            1
+        )
+
+        face_details.append(_normalize_face_info({
+            'id': face_id,
+            'bbox': [x1, y1, x2, y2],
+            'confidence': confidence,
+            'method': method
+        }))
+
+    return output_image, face_details
+
+
+def _get_detector_specs():
+    return [
+        {
+            'key': 'mediapipe',
+            'label': 'MediaPipe',
+            'description': 'Fast Google detector optimized for modern images.',
+            'available': lambda: _HAS_MEDIAPIPE and _MP_FACE_DETECTOR is not None,
+            'runner': lambda image, min_conf: detect_faces_mediapipe(image, min_conf)
+        },
+        {
+            'key': 'mtcnn',
+            'label': 'MTCNN',
+            'description': 'CNN-based detector that performs well on harder faces.',
+            'available': lambda: _HAS_MTCNN and _MTCNN_DETECTOR is not None,
+            'runner': lambda image, min_conf: detect_faces_mtcnn(image, min_conf)
+        },
+        {
+            'key': 'face_recognition',
+            'label': 'face_recognition',
+            'description': 'HOG-based detector useful for profiles and encoding workflows.',
+            'available': lambda: _HAS_FACE_RECOGNITION,
+            'runner': lambda image, min_conf: detect_faces_face_recognition(image, min_conf)
+        },
+        {
+            'key': 'haar',
+            'label': 'Haar Cascade',
+            'description': 'Classic OpenCV fallback detector with wide compatibility.',
+            'available': lambda: True,
+            'runner': lambda image, min_conf: detect_faces_haar(image, min_conf)
+        }
+    ]
+
+
+def get_detector_catalog():
+    """
+    Return the detector list with availability metadata for UI or API usage.
+    """
+    catalog = []
+    for spec in _get_detector_specs():
+        catalog.append({
+            'key': spec['key'],
+            'label': spec['label'],
+            'description': spec['description'],
+            'available': bool(spec['available']())
+        })
+    return catalog
+
+
+def compare_detection_modes(bgr_image, min_conf=0.5, detector_keys=None):
+    """
+    Run multiple detectors independently on the same image for side-by-side comparison.
+    """
+    processed_image = preprocess_image(bgr_image.copy())
+    specs = _get_detector_specs()
+    known_keys = {spec['key'] for spec in specs}
+    requested_keys = [str(key).strip().lower() for key in (detector_keys or []) if str(key).strip()]
+    requested_set = set(requested_keys)
+
+    detector_results = []
+
+    for spec in specs:
+        if requested_set and spec['key'] not in requested_set:
+            continue
+
+        available = bool(spec['available']())
+        detector_result = {
+            'key': spec['key'],
+            'label': spec['label'],
+            'description': spec['description'],
+            'available': available,
+            'face_count': 0,
+            'faces': [],
+            'analysis_report': {},
+            'summary': {
+                'avg_confidence': None,
+                'top_confidence': None,
+                'detected_methods': []
+            }
+        }
+
+        if not available:
+            detector_result['error'] = f"{spec['label']} is not available in this environment."
+            detector_results.append(detector_result)
+            continue
+
+        try:
+            detected_faces = spec['runner'](processed_image.copy(), min_conf)
+            output_image, face_details = _draw_detected_faces(processed_image, detected_faces)
+            analysis_report = generate_face_analysis_report(face_details)
+            confidence_stats = analysis_report.get('confidence_stats') or {}
+
+            detector_result.update({
+                'face_count': len(face_details),
+                'faces': face_details,
+                'analysis_report': analysis_report,
+                'summary': {
+                    'avg_confidence': confidence_stats.get('avg'),
+                    'top_confidence': confidence_stats.get('max'),
+                    'detected_methods': sorted({
+                        face.get('method') for face in face_details if face.get('method')
+                    })
+                },
+                'output_image': output_image
+            })
+        except Exception as e:
+            detector_result['error'] = str(e)
+
+        detector_results.append(detector_result)
+
+    for requested_key in requested_keys:
+        if requested_key in known_keys:
+            continue
+        detector_results.append({
+            'key': requested_key,
+            'label': requested_key.replace('_', ' ').title(),
+            'description': 'Unknown detector key.',
+            'available': False,
+            'face_count': 0,
+            'faces': [],
+            'analysis_report': {},
+            'summary': {
+                'avg_confidence': None,
+                'top_confidence': None,
+                'detected_methods': []
+            },
+            'error': 'Unknown detector requested.'
+        })
+
+    successful_results = [
+        result for result in detector_results
+        if result.get('available') and not result.get('error')
+    ]
+    face_counts = [result['face_count'] for result in successful_results]
+
+    if not face_counts:
+        agreement = 'Unavailable'
+        best_detectors = []
+        max_faces = 0
+        min_faces = 0
+        count_spread = 0
+        average_faces = 0
+    else:
+        max_faces = max(face_counts)
+        min_faces = min(face_counts)
+        count_spread = max_faces - min_faces
+        average_faces = round(sum(face_counts) / len(face_counts), 2)
+        best_detectors = []
+        if max_faces > 0:
+            best_detectors = [
+                result['label'] for result in successful_results
+                if result['face_count'] == max_faces
+            ]
+        if len(face_counts) <= 1:
+            agreement = 'Single detector'
+        elif count_spread == 0:
+            agreement = 'Strong'
+        elif count_spread == 1:
+            agreement = 'Moderate'
+        else:
+            agreement = 'Mixed'
+
+    return {
+        'detectors': detector_results,
+        'summary': {
+            'requested_detectors': len(detector_results),
+            'available_detectors': sum(1 for result in detector_results if result.get('available')),
+            'successful_detectors': len(successful_results),
+            'average_faces': average_faces,
+            'max_faces': max_faces,
+            'min_faces': min_faces,
+            'count_spread': count_spread,
+            'best_detectors': best_detectors,
+            'agreement': agreement
+        }
+    }
+
+
 def detect_and_draw_faces_realtime(bgr_image, min_conf=0.5):
     """
     Lightweight webcam pipeline that favors responsiveness over exhaustive analysis.
@@ -573,7 +820,7 @@ def detect_and_draw_faces(bgr_image, min_conf=0.5, analysis_mode='basic'):
     all_faces.extend(mtcnn_faces)
     
     # Method 3: face_recognition (good for profile faces)
-    fr_faces = detect_faces_face_recognition(processed_image)
+    fr_faces = detect_faces_face_recognition(processed_image, min_conf)
     all_faces.extend(fr_faces)
     
     # Method 4: Haar Cascades (fallback for challenging conditions)
@@ -600,13 +847,7 @@ def detect_and_draw_faces(bgr_image, min_conf=0.5, analysis_mode='basic'):
         method = face['method']
         
         # Use different colors for different methods
-        color_map = {
-            'MediaPipe': (0, 255, 0),    # Green
-            'MTCNN': (255, 0, 0),        # Blue
-            'face_recognition': (0, 165, 255),  # Orange
-            'Haar': (255, 255, 0)        # Cyan
-        }
-        color = color_map.get(method, (0, 255, 0))
+        color = _get_method_color(method)
         
         # Draw rectangle
         cv2.rectangle(output_image, (x1, y1), (x2, y2), color, 2)

@@ -22,12 +22,14 @@
           <button class="tab active" onclick="showTab(event, 'single')">Single Image</button>
           <button class="tab" onclick="showTab(event, 'batch')">Batch Processing</button>
           <button class="tab" onclick="showTab(event, 'compare')">Face Comparison</button>
+          <button class="tab" onclick="showTab(event, 'detector-compare')">Detector Comparison</button>
           <button class="tab" onclick="showTab(event, 'webcam')">&#127909; Live Webcam</button>
         </div>
 
         {% include "partials/_tab_single.html" %}
         {% include "partials/_tab_batch.html" %}
         {% include "partials/_tab_compare.html" %}
+        {% include "partials/_tab_detector_compare.html" %}
         {% include "partials/_tab_webcam.html" %}
 
         {% include "partials/_results.html" %}

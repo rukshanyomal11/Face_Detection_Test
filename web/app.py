@@ -19,6 +19,7 @@ from src.utils.detector import (
     detect_and_draw_faces_realtime,
     process_batch_images, 
     compare_faces,
+    compare_detection_modes,
     extract_face_crops,
     generate_face_analysis_report,
     detect_face_landmarks
@@ -356,6 +357,60 @@ async def compare_faces_endpoint(
             "comparison": comparison_result
         })
         
+    except HTTPException:
+        raise
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": str(e)}
+        )
+
+
+@app.post("/compare-detectors", response_class=JSONResponse)
+async def compare_detectors_endpoint(
+    file: UploadFile = File(...),
+    detectors: Optional[List[str]] = Form(None),
+    min_confidence: float = Form(0.3)
+):
+    """
+    Run multiple face detectors independently and compare their results side by side.
+    """
+    try:
+        if file.content_type not in ["image/jpeg", "image/png", "image/jpg"]:
+            raise HTTPException(status_code=400, detail="Please upload a JPG or PNG image.")
+
+        content = await file.read()
+        img_array = np.frombuffer(content, dtype=np.uint8)
+        img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+
+        if img is None:
+            raise HTTPException(status_code=400, detail="Could not read the image.")
+
+        comparison = compare_detection_modes(
+            img,
+            min_conf=min_confidence,
+            detector_keys=detectors
+        )
+
+        for detector in comparison.get("detectors", []):
+            output_image = detector.pop("output_image", None)
+            if output_image is None:
+                detector["output_url"] = None
+                continue
+
+            output_name = f"detector_compare_{detector['key']}_{uuid.uuid4().hex[:10]}.jpg"
+            output_path = os.path.join(OUTPUT_DIR, output_name)
+            cv2.imwrite(output_path, output_image, [cv2.IMWRITE_JPEG_QUALITY, 95])
+            detector["output_url"] = f"/static/outputs/{output_name}"
+
+        cleanup_output_dir()
+
+        return JSONResponse(content=_json_safe({
+            "success": True,
+            "comparison": comparison,
+            "output_stats": get_output_stats()
+        }))
+
     except HTTPException:
         raise
     except Exception as e:

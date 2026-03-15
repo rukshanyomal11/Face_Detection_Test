@@ -24,6 +24,15 @@
     return str;
   }
 
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   function buildCsv(report, faces) {
     const lines = [];
     lines.push('Summary');
@@ -146,7 +155,7 @@
   document.getElementById('fileInput').addEventListener('change', function(e) {
     const file = e.target.files[0];
     const fileName = file?.name || 'No file selected';
-    document.querySelector('.file-label').textContent = '\uD83D\uDCF7 ' + fileName;
+    document.getElementById('singleFileLabel').textContent = '\uD83D\uDCF7 ' + fileName;
     if (file) {
       const reader = new FileReader();
       reader.onload = function(ev) {
@@ -164,6 +173,28 @@
   const confidenceValue  = document.getElementById('confidenceValue');
   confidenceSlider.addEventListener('input', function() {
     confidenceValue.textContent = this.value;
+  });
+
+  // Detector comparison: file preview
+  document.getElementById('detectorCompareFile').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    const fileName = file?.name || 'No file selected';
+    document.getElementById('detectorCompareFileLabel').textContent = '\uD83D\uDD0D ' + fileName;
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = function(ev) {
+        document.getElementById('detectorComparePreview').src = ev.target.result;
+        document.getElementById('detectorComparePreviewWrap').style.display = 'block';
+      };
+      reader.readAsDataURL(file);
+    } else {
+      document.getElementById('detectorComparePreviewWrap').style.display = 'none';
+    }
+  });
+
+  // Detector comparison: confidence slider
+  document.getElementById('detectorCompareConfidence').addEventListener('input', function() {
+    document.getElementById('detectorCompareConfidenceValue').textContent = this.value;
   });
 
   // ── Single image: loading state ──────────────────────────────────────────────
@@ -401,6 +432,150 @@
       scheduleNextWebcamCapture(webcamConfig.startupDelayMs);
     } catch (err) {
       alert('Camera access denied or unavailable: ' + err.message);
+    }
+  }
+
+  // Detector comparison
+  async function compareDetectors() {
+    const form = document.getElementById('detectorCompareForm');
+    const fileInput = document.getElementById('detectorCompareFile');
+    const resultsDiv = document.getElementById('detectorCompareResults');
+    const selectedDetectors = Array.from(
+      document.querySelectorAll('#detectorCompareForm input[name="detectors"]:checked')
+    );
+
+    if (!fileInput.files || fileInput.files.length === 0) {
+      resultsDiv.innerHTML = '<div class="notice error">Please choose an image to compare detectors.</div>';
+      return;
+    }
+
+    if (selectedDetectors.length === 0) {
+      resultsDiv.innerHTML = '<div class="notice error">Select at least one detector to compare.</div>';
+      return;
+    }
+
+    const formData = new FormData(form);
+
+    try {
+      resultsDiv.innerHTML = '<div class="loading" style="display:block;"><div class="spinner"></div><p>Running detector comparison...</p></div>';
+
+      const response = await fetch('/compare-detectors', { method: 'POST', body: formData });
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.detail || data.error || 'Detector comparison failed');
+      }
+
+      const comparison = data.comparison || {};
+      const summary = comparison.summary || {};
+      const detectors = comparison.detectors || [];
+      const bestDetectors = Array.isArray(summary.best_detectors) ? summary.best_detectors : [];
+
+      let html = `
+        <div class="detector-overview">
+          <h3>Detector Comparison Summary</h3>
+          <p>
+            Compared ${summary.successful_detectors || 0} working detector(s) out of ${summary.requested_detectors || detectors.length}.
+            Agreement level: <strong>${escapeHtml(summary.agreement || 'Unavailable')}</strong>.
+          </p>
+          <div class="stat-grid">
+            <div class="stat-item">
+              <div class="stat-number">${summary.available_detectors ?? 0}</div>
+              <div class="stat-label">Available Detectors</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-number">${summary.average_faces ?? 0}</div>
+              <div class="stat-label">Average Faces</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-number">${summary.max_faces ?? 0}</div>
+              <div class="stat-label">Highest Count</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-number">${summary.count_spread ?? 0}</div>
+              <div class="stat-label">Count Spread</div>
+            </div>
+          </div>
+          ${bestDetectors.length ? `
+            <div class="chip-row" style="margin-top:14px;">
+              ${bestDetectors.map(label => `<span class="chip">Top Count: ${escapeHtml(label)}</span>`).join('')}
+            </div>` : ''}
+        </div>
+        <div class="detector-compare-grid">
+      `;
+
+      detectors.forEach(detector => {
+        const analysisReport = detector.analysis_report || {};
+        const confidenceStats = analysisReport.confidence_stats || {};
+        const faces = Array.isArray(detector.faces) ? detector.faces : [];
+        const detectedMethods = detector.summary?.detected_methods || [];
+        const isUnavailable = !detector.available;
+        const statusLabel = isUnavailable ? 'Unavailable' : (detector.error ? 'Error' : 'Ready');
+        const statusClass = isUnavailable ? 'offline' : '';
+        const avgConfidence = confidenceStats.avg !== undefined && confidenceStats.avg !== null
+          ? Number(confidenceStats.avg).toFixed(2)
+          : 'N/A';
+        const topConfidence = confidenceStats.max !== undefined && confidenceStats.max !== null
+          ? Number(confidenceStats.max).toFixed(2)
+          : 'N/A';
+        const methodsHtml = detectedMethods.length
+          ? detectedMethods.map(method => `<span class="chip">${escapeHtml(method)}</span>`).join('')
+          : '<span class="chip">No detections</span>';
+        const facesHtml = faces.length
+          ? `<div class="detector-face-list">${faces.slice(0, 4).map(face => `
+              <div class="detector-face-item">
+                <span>Face ${face.id} (${escapeHtml(face.method || 'Unknown')})</span>
+                <span>${Number(face.confidence || 0).toFixed(2)}</span>
+              </div>
+            `).join('')}</div>`
+          : '<div class="stat-label">No faces returned for this detector at the selected threshold.</div>';
+        const mediaHtml = detector.output_url
+          ? `<img src="${escapeHtml(detector.output_url)}" alt="${escapeHtml(detector.label)} detector output">`
+          : `<div class="detector-placeholder">${escapeHtml(detector.error || 'No annotated output available.')}</div>`;
+        const noteClass = detector.error && detector.available ? 'error' : 'detection-info';
+        const noteHtml = detector.error
+          ? `<div class="notice ${noteClass}">${escapeHtml(detector.error)}</div>`
+          : '';
+
+        html += `
+          <article class="detector-result-card ${isUnavailable ? 'is-unavailable' : ''}">
+            <div class="detector-card-header">
+              <div>
+                <h3>${escapeHtml(detector.label)}</h3>
+                <p>${escapeHtml(detector.description || '')}</p>
+              </div>
+              <span class="detector-status ${statusClass}">${escapeHtml(statusLabel)}</span>
+            </div>
+            <div class="detector-media">${mediaHtml}</div>
+            ${noteHtml}
+            <div class="detector-metrics">
+              <div class="detector-metric">
+                <div class="detector-metric-value">${detector.face_count ?? 0}</div>
+                <div class="detector-metric-label">Faces Found</div>
+              </div>
+              <div class="detector-metric">
+                <div class="detector-metric-value">${avgConfidence}</div>
+                <div class="detector-metric-label">Average Confidence</div>
+              </div>
+              <div class="detector-metric">
+                <div class="detector-metric-value">${topConfidence}</div>
+                <div class="detector-metric-label">Top Confidence</div>
+              </div>
+              <div class="detector-metric">
+                <div class="detector-metric-value">${analysisReport.face_size_stats?.avg_area ?? 'N/A'}</div>
+                <div class="detector-metric-label">Avg Face Area</div>
+              </div>
+            </div>
+            <div class="chip-row">${methodsHtml}</div>
+            ${facesHtml}
+          </article>
+        `;
+      });
+
+      html += '</div>';
+      resultsDiv.innerHTML = html;
+    } catch (error) {
+      resultsDiv.innerHTML = `<div class="notice error">Error: ${escapeHtml(error.message)}</div>`;
     }
   }
 

@@ -6,6 +6,7 @@ A FastAPI-based face detection studio with a polished web interface for:
 - advanced face analysis
 - batch image processing
 - face comparison
+- detector mode comparison
 - live webcam detection
 - JSON and CSV report export
 
@@ -18,6 +19,7 @@ The app combines multiple computer vision libraries and automatically falls back
 - Analysis modes for basic detection, advanced attributes, landmarks, and full analysis
 - Batch processing for up to 10 images at once
 - Face comparison endpoint for similarity checking
+- Detector comparison tab for side-by-side MediaPipe, MTCNN, face_recognition, and Haar results
 - Live webcam tab with `Fast` and `Accurate` modes
 - Automatic cleanup for generated output files
 - Downloadable processed images plus JSON and CSV exports for reports
@@ -49,7 +51,14 @@ Upload one `JPG` or `PNG` image and choose an analysis mode:
 - Compare detected faces
 - Return similarity, distance, and same-person estimate
 
-### 4. Live Webcam
+### 4. Detector Mode Comparison
+
+- Upload one image
+- Run MediaPipe, MTCNN, face_recognition, and Haar independently
+- Compare annotated outputs, face counts, and confidence summaries side by side
+- See when a detector is unavailable in the current environment
+
+### 5. Live Webcam
 
 Two webcam modes are available:
 
@@ -58,7 +67,7 @@ Two webcam modes are available:
 - `Accurate`
   Slower, but uses the heavier detection pipeline for better face pickup
 
-### 5. Report and Output Tools
+### 6. Report and Output Tools
 
 After a successful analysis, the UI can show:
 
@@ -182,6 +191,14 @@ http://127.0.0.1:8000/redoc
 2. Upload two face images.
 3. Click `Compare Faces`.
 
+### Detector Comparison
+
+1. Open the `Detector Comparison` tab.
+2. Upload one image.
+3. Choose the detectors you want to compare.
+4. Adjust confidence if needed.
+5. Click `Run Detector Comparison`.
+
 ### Live Webcam
 
 1. Open the `Live Webcam` tab.
@@ -258,6 +275,16 @@ Form fields:
 
 - `file1`
 - `file2`
+
+### `POST /compare-detectors`
+
+Run multiple detectors independently on the same uploaded image.
+
+Form fields:
+
+- `file`
+- `detectors`
+- `min_confidence`
 
 ### `POST /api/detect`
 

@@ -511,6 +511,208 @@
       border: 1px solid var(--border);
     }
 
+    .compare-controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+      margin-bottom: 18px;
+    }
+
+    .detector-picker {
+      display: grid;
+      gap: 12px;
+    }
+
+    .detector-option {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 12px;
+      align-items: start;
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--surface-2);
+      cursor: pointer;
+      transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .detector-option:hover {
+      transform: translateY(-1px);
+      border-color: rgba(37, 99, 235, 0.35);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .detector-option input {
+      margin-top: 4px;
+      accent-color: var(--brand);
+    }
+
+    .detector-option strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--ink);
+    }
+
+    .detector-option small,
+    .detector-help {
+      display: block;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .detector-help {
+      margin-top: 10px;
+    }
+
+    .detector-overview {
+      background: var(--surface-2);
+      border-radius: 16px;
+      padding: 18px;
+      border: 1px solid var(--border);
+    }
+
+    .detector-overview h3 {
+      margin: 0 0 8px;
+    }
+
+    .detector-overview p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .detector-compare-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+      gap: 16px;
+    }
+
+    .detector-result-card {
+      display: grid;
+      gap: 14px;
+      background: white;
+      border-radius: 18px;
+      padding: 18px;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .detector-result-card.is-unavailable {
+      background: linear-gradient(180deg, #fff, #f8fafc);
+      opacity: 0.88;
+    }
+
+    .detector-card-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .detector-card-header h3 {
+      margin: 0 0 4px;
+      font-size: 1.08rem;
+    }
+
+    .detector-card-header p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.5;
+    }
+
+    .detector-status {
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      background: rgba(15, 118, 110, 0.12);
+      color: var(--brand);
+      border: 1px solid rgba(15, 118, 110, 0.2);
+    }
+
+    .detector-status.offline {
+      background: #fff7ed;
+      color: #b45309;
+      border-color: #fed7aa;
+    }
+
+    .detector-media {
+      min-height: 180px;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: linear-gradient(180deg, #e2e8f0, #f8fafc);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .detector-media img {
+      width: 100%;
+      display: block;
+    }
+
+    .detector-placeholder {
+      padding: 20px;
+      color: var(--muted);
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    .detector-metrics {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .detector-metric {
+      background: var(--surface-2);
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      padding: 12px;
+    }
+
+    .detector-metric-value {
+      font-family: "Space Grotesk", "Segoe UI", Arial, sans-serif;
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--brand-2);
+    }
+
+    .detector-metric-label {
+      margin-top: 4px;
+      font-size: 0.84rem;
+      color: var(--muted);
+    }
+
+    .detector-face-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .detector-face-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 12px;
+      background: var(--surface-2);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      font-size: 0.9rem;
+    }
+
+    .detector-face-item span:last-child {
+      color: var(--muted);
+      font-family: "Space Grotesk", "Segoe UI", Arial, sans-serif;
+      font-weight: 600;
+    }
+
     .similarity-score {
       font-size: 2.2rem;
       font-weight: 700;
